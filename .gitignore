@@ -1,0 +1,11 @@
+# Private values for a real account stay out of git. See AGENTS.md.
+*.local.*
+.env
+.env.*
+config.local/
+
+# Build output
+cdk.out/
+node_modules/
+__pycache__/
+.venv/

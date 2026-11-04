@@ -1,0 +1,25 @@
+schema: spec-driven
+
+context: |
+  What this repo is: the specs and code that set up an AWS account for one
+  developer to let AI coding agents work in it, without surprise costs,
+  security holes or a mess to clean up. Starting over with a new account
+  should be a deploy plus a short runbook.
+
+  The research and decisions behind each requirement live in
+  https://github.com/ErikBean/research, under knowledge/tech/aws-agent-guardrails/
+  and knowledge/projects/aws-agent-bootstrap/. Cite them by GitHub URL; don't
+  copy their reasoning here.
+
+  This repo is public. Specs and code must never contain account IDs, email
+  addresses, organization or Identity Center IDs, user names, or any other
+  value tied to a real account. Use placeholders and read real values from
+  gitignored local config. See AGENTS.md.
+
+rules:
+  specs:
+    - State each requirement as an observable property of the account, such as what an agent's role can or can't do, not as setup steps
+    - Cite the research decision or finding behind each requirement by GitHub URL
+    - Use AWS's documentation placeholder account IDs (111122223333, 444455556666) in examples
+  design:
+    - Name any step that can't be automated and must go in the runbook
