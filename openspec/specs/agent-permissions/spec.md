@@ -26,7 +26,11 @@ The builder permission set SHALL NOT allow creating, updating or deleting IAM ro
 
 The builder permission set SHALL allow `iam:PassRole` only on roles whose path is `/agent/`, and only when `iam:PassedToService` is one of the allowed services below. It SHALL NOT allow passing any other role.
 
-Allowed services: not yet chosen.
+Allowed services:
+
+- `lambda.amazonaws.com`
+
+Adding a service is a change to this spec.
 
 Reasoning: [finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/passrole-scoping.md).
 
