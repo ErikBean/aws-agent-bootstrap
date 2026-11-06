@@ -1,0 +1,20 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "NoMarketplaceTerms",
+      "Effect": "Deny",
+      "Action": ["aws-marketplace:Subscribe", "aws-marketplace:AcceptAgreementRequest"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "PassAgentRolesToAllowedServices",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::*:role/agent/*",
+      "Condition": {
+        "StringEquals": { "iam:PassedToService": ["lambda.amazonaws.com"] }
+      }
+    }
+  ]
+}
