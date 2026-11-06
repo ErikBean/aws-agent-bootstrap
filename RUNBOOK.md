@@ -2,9 +2,17 @@
 
 Steps for building the account that aren't fully automated. Run them from a clone of this repo, signed in to the management account with an admin role.
 
-## Create the agent account
+## Create the agent and production accounts
 
-This implements [`account-structure`](openspec/specs/account-structure/spec.md): a member account used only by agents, in an `Agents` OU, with the agent permission sets assigned to it and to no other account.
+This implements [`account-structure`](openspec/specs/account-structure/spec.md): a member account used only by agents, in an `Agents` OU, and a production account shared by every app, in a `Production` OU. The agent permission sets are assigned to the agent account and no other. The admin permission set is assigned to both.
+
+A new organization may be limited to fewer accounts than this needs. Check before deploying:
+
+```bash
+aws service-quotas get-service-quota --service-code organizations --quota-code L-E619E033 --region us-east-1
+```
+
+The value must be at least the number of accounts already in the organization plus two. If it's lower, request an increase in Service Quotas from the management account. Requests at or below AWS's default of 10 may be refused there, in which case ask for the lowest value it accepts, or open an Account and billing support case.
 
 1. **Sign in** to the management account through IAM Identity Center:
 
@@ -20,10 +28,10 @@ This implements [`account-structure`](openspec/specs/account-structure/spec.md):
    | --- | --- |
    | `ORGANIZATION_ROOT_ID` | `aws organizations list-roots --query "Roots[0].Id"` |
    | `IDENTITY_CENTER_INSTANCE_ARN` | `aws sso-admin list-instances --query "Instances[0].InstanceArn"` |
-   | `BUILDER_PERMISSION_SET_ARN`, `READONLY_PERMISSION_SET_ARN` | `aws sso-admin list-permission-sets --instance-arn <instance-arn>`, then `aws sso-admin describe-permission-set` on each to find `Agent-Builder` and `Agent-ReadOnly` |
-   | `PRINCIPAL_ID` | `aws identitystore list-users --identity-store-id <store-id>`, where the store ID is in `list-instances`. Use the dedicated agent user's ID, not your own; see [`agent-client`](openspec/specs/agent-client/spec.md) |
+   | `BUILDER_PERMISSION_SET_ARN`, `READONLY_PERMISSION_SET_ARN`, `ADMIN_PERMISSION_SET_ARN` | `aws sso-admin list-permission-sets --instance-arn <instance-arn>`, then `aws sso-admin describe-permission-set` on each to find `Agent-Builder`, `Agent-ReadOnly` and `Admin` |
+   | `AGENT_PRINCIPAL_ID`, `ADMIN_PRINCIPAL_ID` | `aws identitystore list-users --identity-store-id <store-id>`, where the store ID is in `list-instances`. The agent principal is the dedicated agent user; see [`agent-client`](openspec/specs/agent-client/spec.md). The admin principal is your own user. They must differ, and the stack refuses to deploy if they don't. |
 
-   `AGENT_ACCOUNT_EMAIL` must be an address no other AWS account uses. A plus-address of an inbox you already read works.
+   `AGENT_ACCOUNT_EMAIL` and `PRODUCTION_ACCOUNT_EMAIL` must each be an address no other AWS account uses. A plus-address of an inbox you already read works.
 
 3. **Deploy:**
 
@@ -31,7 +39,7 @@ This implements [`account-structure`](openspec/specs/account-structure/spec.md):
    scripts/deploy-account-structure.sh
    ```
 
-   Creating the account takes a few minutes. The stack retains the account and the OU, so deleting the stack never closes the account.
+   Creating the accounts takes a few minutes. The stack retains the accounts and the OUs, so deleting the stack never closes an account.
 
 4. **Remove the agent permission sets from every other account.** Assignments made before this stack existed, such as to the management account, aren't managed by it. For each agent permission set, list where it's provisioned:
 
@@ -55,6 +63,6 @@ This implements [`account-structure`](openspec/specs/account-structure/spec.md):
    scripts/check-account-structure.sh
    ```
 
-6. **Point local profiles at the agent account.** In `~/.aws/config`, set `sso_account_id` in the agent profiles to the new account's ID, from the stack's `AgentAccountId` output.
+6. **Point local profiles at the agent account.** In `~/.aws/config`, set `sso_account_id` in the agent profiles to the new account's ID, from the stack's `AgentAccountId` output. Add admin profiles for the agent and production accounts, using the `Admin` role and the `AgentAccountId` and `ProductionAccountId` outputs.
 
-The new account's root user has no password. Leave it that way. Use the management account's admin role or `OrganizationAccountAccessRole` if you ever need admin access to the agent account.
+The new accounts' root users have no password. Leave it that way. Use the management account's admin role or `OrganizationAccountAccessRole` if you ever need admin access without Identity Center.
