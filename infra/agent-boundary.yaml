@@ -1,0 +1,57 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  The agent boundary: the permissions boundary every CDK bootstrap role and every
+  role a deploy creates must carry. Deploy in each member account, before CDK
+  bootstrap. Implements openspec/specs/deploy-permissions/spec.md.
+
+Parameters:
+  BoundaryName:
+    Type: String
+    Default: agent-boundary
+
+Resources:
+  # Started from the AWS CDK's example boundary (cdk bootstrap
+  # --example-permissions-boundary), with the policy name made our own.
+  AgentBoundary:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Ref BoundaryName
+      Path: /
+      Description: Agent boundary. Caps every role CDK deploys run as or create.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # A boundary with no allow denies everything.
+          - Sid: ExplicitAllowAll
+            Effect: Allow
+            Action: "*"
+            Resource: "*"
+          - Sid: DenyRoleOrUserCreationWithoutAgentBoundary
+            Effect: Deny
+            Action:
+              - iam:CreateUser
+              - iam:CreateRole
+              - iam:PutRolePermissionsBoundary
+              - iam:PutUserPermissionsBoundary
+            Resource: "*"
+            Condition:
+              StringNotEquals:
+                iam:PermissionsBoundary: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/${BoundaryName}
+          - Sid: DenyAgentBoundaryAlteration
+            Effect: Deny
+            Action:
+              - iam:CreatePolicyVersion
+              - iam:DeletePolicy
+              - iam:DeletePolicyVersion
+              - iam:SetDefaultPolicyVersion
+            Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/${BoundaryName}
+          - Sid: DenyBoundaryRemoval
+            Effect: Deny
+            Action:
+              - iam:DeleteUserPermissionsBoundary
+              - iam:DeleteRolePermissionsBoundary
+            Resource: "*"
+
+Outputs:
+  AgentBoundaryArn:
+    Value: !Ref AgentBoundary

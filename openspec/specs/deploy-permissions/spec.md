@@ -2,17 +2,17 @@
 
 ## Purpose
 
-What an agent can create when it deploys with the AWS CDK in the agent account. Deploys work, but everything they run as or create is capped by one permissions boundary that nothing in the agent account can remove or weaken.
+What a deploy can create when it runs with the AWS CDK in a member account: the agent account, where agents deploy, and the production account, where CI deploys. Deploys work, but everything they run as or create is capped by one permissions boundary that nothing in the account can remove or weaken.
 
-Reasoning: [decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/cdk-deploys-under-permissions-boundary.md), which links the research behind it.
+Reasoning: [decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/cdk-deploys-under-permissions-boundary.md), which links the research behind it. It covers the production account too, because [production apps deploy there through CDK](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/production-in-shared-account.md).
 
-The boundary is referred to here as the agent boundary. Its name and account ID come from local configuration, not from this repo.
+The boundary is referred to here as the agent boundary. It's a customer managed policy named `agent-boundary` in each member account.
 
 ## Requirements
 
 ### Requirement: An owned agent boundary with anti-escape rules
 
-The agent account SHALL have a customer managed policy, the agent boundary, maintained by the account-level setup, not by any app. Starting from the AWS CDK's example boundary, it SHALL deny:
+Each member account SHALL have a customer managed policy, the agent boundary, maintained by the account-level setup, not by any app. Starting from the AWS CDK's example boundary, it SHALL deny:
 
 - creating an IAM role or user unless the agent boundary is its permissions boundary
 - setting any permissions boundary other than the agent boundary on a role or user
@@ -33,23 +33,23 @@ It MAY also deny services or actions, as other specs require.
 
 ### Requirement: CDK bootstrap roles carry the agent boundary
 
-The agent account SHALL be bootstrapped with the agent boundary as the custom permissions boundary, applied to all bootstrap roles, not only the CloudFormation execution role. Re-bootstrapping SHALL keep both settings.
+Each member account SHALL be bootstrapped with the agent boundary as the custom permissions boundary, applied to all bootstrap roles, not only the CloudFormation execution role. Re-bootstrapping SHALL keep both settings.
 
 Reasoning: by default CDK's execution role has `AdministratorAccess` with no boundary ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/cdk-bootstrap-roles-admin-by-default.md)), and the boundary reaches the other bootstrap roles only with `--apply-permissions-boundary-to-all-roles` ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/cdk-boundary-on-all-bootstrap-roles.md)).
 
 #### Scenario: Inspecting the bootstrap roles
 
-- **WHEN** the permissions boundary of each CDK bootstrap role in the agent account is read
+- **WHEN** the permissions boundary of each CDK bootstrap role in a member account is read
 - **THEN** every one is the agent boundary
 
 #### Scenario: Re-bootstrapping
 
-- **WHEN** the agent account is bootstrapped again through the account-level setup
+- **WHEN** a member account is bootstrapped again through the account-level setup
 - **THEN** the bootstrap roles still carry the agent boundary
 
 ### Requirement: CDK apps attach the boundary to the roles they create
 
-Every CDK app deployed to the agent account SHALL set the `@aws-cdk/core:permissionsBoundary` context key to the agent boundary.
+Every CDK app deployed to a member account SHALL set the `@aws-cdk/core:permissionsBoundary` context key to the agent boundary.
 
 Reasoning: [finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/cdk-boundary-app-wide.md). An open CDK bug (aws/aws-cdk#30179) leaves a custom-resource role out; under the agent boundary that deploy fails rather than creating an unbounded role.
 
@@ -60,7 +60,7 @@ Reasoning: [finding](https://github.com/ErikBean/research/blob/main/knowledge/te
 
 ### Requirement: An SCP backs up the anti-escape rules
 
-The agent account SHALL have an SCP that denies the same anti-escape actions as the agent boundary, so they hold even if the boundary policy is changed by an administrator in the account.
+The member accounts SHALL have an SCP that denies the same anti-escape actions as the agent boundary, so they hold even if the boundary policy is changed by an administrator in the account. The SCP MAY let the developer's admin permission set edit the boundary policy, so the boundary can change through this repo's code. It SHALL NOT exempt anyone from the denial of creating a role or user without the agent boundary.
 
 This requirement takes effect only after a policy simulator test, using `SimulateCustomPolicy` with the draft SCP and a supplied `iam:PermissionsBoundary` value, shows that the SCP denies role creation without the agent boundary and allows it with the boundary. That SCPs evaluate this condition key is inferred, not yet tested ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/scp-can-require-permissions-boundary.md)).
 
@@ -69,7 +69,7 @@ This requirement takes effect only after a policy simulator test, using `Simulat
 - **WHEN** the draft SCP is simulated for `iam:CreateRole` with `iam:PermissionsBoundary` set to a policy other than the agent boundary
 - **THEN** the simulation returns a deny
 
-#### Scenario: An administrator role in the agent account loosens the boundary
+#### Scenario: An administrator role in a member account loosens the boundary
 
-- **WHEN** a role in the agent account without the agent boundary edits the boundary policy, and a deploy then tries to create a role without the boundary
+- **WHEN** a role in a member account without the agent boundary edits the boundary policy, and a deploy then tries to create a role without the boundary
 - **THEN** the SCP still denies the role creation
