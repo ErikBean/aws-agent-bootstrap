@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  The agent account: a member account of the organization, in an Agents OU, with
+  the agent permission sets assigned to it. Deploy in the management account.
+  Implements openspec/specs/account-structure/spec.md.
+
+Parameters:
+  OrganizationRootId:
+    Type: String
+    AllowedPattern: "^r-[a-z0-9]{4,32}$"
+    Description: The organization's root ID, from `aws organizations list-roots`.
+  AgentAccountName:
+    Type: String
+    Default: agents
+  AgentAccountEmail:
+    Type: String
+    Description: Root email for the new account. It must not be used by any other AWS account.
+  IdentityCenterInstanceArn:
+    Type: String
+    Description: From `aws sso-admin list-instances`.
+  BuilderPermissionSetArn:
+    Type: String
+    Description: The Agent-Builder permission set.
+  ReadOnlyPermissionSetArn:
+    Type: String
+    Description: The Agent-ReadOnly permission set.
+  PrincipalId:
+    Type: String
+    Description: The Identity Center user or group that signs in as the agent.
+  PrincipalType:
+    Type: String
+    AllowedValues: [USER, GROUP]
+    Default: USER
+
+Resources:
+  AgentsOu:
+    Type: AWS::Organizations::OrganizationalUnit
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: Agents
+      ParentId: !Ref OrganizationRootId
+
+  # Retained so that deleting or replacing the stack never closes the account.
+  AgentAccount:
+    Type: AWS::Organizations::Account
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AccountName: !Ref AgentAccountName
+      Email: !Ref AgentAccountEmail
+      ParentIds: [!Ref AgentsOu]
+
+  BuilderAssignment:
+    Type: AWS::SSO::Assignment
+    Properties:
+      InstanceArn: !Ref IdentityCenterInstanceArn
+      PermissionSetArn: !Ref BuilderPermissionSetArn
+      PrincipalId: !Ref PrincipalId
+      PrincipalType: !Ref PrincipalType
+      TargetId: !GetAtt AgentAccount.AccountId
+      TargetType: AWS_ACCOUNT
+
+  ReadOnlyAssignment:
+    Type: AWS::SSO::Assignment
+    Properties:
+      InstanceArn: !Ref IdentityCenterInstanceArn
+      PermissionSetArn: !Ref ReadOnlyPermissionSetArn
+      PrincipalId: !Ref PrincipalId
+      PrincipalType: !Ref PrincipalType
+      TargetId: !GetAtt AgentAccount.AccountId
+      TargetType: AWS_ACCOUNT
+
+Outputs:
+  AgentAccountId:
+    Value: !GetAtt AgentAccount.AccountId
+  AgentsOuId:
+    Value: !Ref AgentsOu
