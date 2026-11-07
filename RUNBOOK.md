@@ -97,7 +97,7 @@ This implements [`deploy-permissions`](openspec/specs/deploy-permissions/spec.md
 
    It confirms every bootstrap role carries the boundary, then tries to create a role without the boundary and expects it to be denied. Run it only after step 2, because before the SCP is attached your admin role is allowed to create that role. If it ever succeeds, the script deletes the role and reports a failure.
 
-## Set the builder's IAM permissions
+## Set the agent permission sets
 
 This implements [`agent-permissions`](openspec/specs/agent-permissions/spec.md). The `Agent-Builder` permission set keeps AWS's `PowerUserAccess` managed policy, which grants no IAM role or policy management and no `iam:PassRole`. Its inline policy, in `infra/agent-builder-inline-policy.json`, adds two statements:
 
@@ -110,4 +110,4 @@ From the management account:
 scripts/apply-agent-permissions.sh
 ```
 
-It runs `scripts/test-agent-permissions.sh` first, which simulates `PowerUserAccess` plus the inline policy against the spec's scenarios, and applies the policy only if every case passes. It then reprovisions the permission set to every account it's assigned to. To allow another service, change the spec first, then the `iam:PassedToService` list in the policy.
+It runs `scripts/test-agent-permissions.sh` first, which simulates `PowerUserAccess` plus the inline policy against the spec's scenarios, and applies the policy only if every case passes. It then sets both `Agent-Builder` and `Agent-ReadOnly` to 4-hour sessions, as [`agent-client`](openspec/specs/agent-client/spec.md) requires, reprovisions them to every account they're assigned to, and prints each one's name and session duration. To allow another service, change the spec first, then the `iam:PassedToService` list in the policy.
