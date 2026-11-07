@@ -1,0 +1,20 @@
+# AWS config for agent sessions only. Copy to ~/.aws/agent-config and fill in
+# the placeholders from your own setup. Never commit the filled-in copy.
+# Sign in once with: AWS_CONFIG_FILE=~/.aws/agent-config aws sso login --sso-session agent
+
+[sso-session agent]
+sso_start_url = https://YOUR_START_URL
+sso_region = us-east-1
+sso_registration_scopes = sso:account:access
+
+[profile agent-builder]
+sso_session = agent
+sso_account_id = 111122223333
+sso_role_name = YOUR_BUILDER_PERMISSION_SET
+region = us-east-1
+
+[profile agent-viewonly]
+sso_session = agent
+sso_account_id = 111122223333
+sso_role_name = YOUR_VIEWONLY_PERMISSION_SET
+region = us-east-1

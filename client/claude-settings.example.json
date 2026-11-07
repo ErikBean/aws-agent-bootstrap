@@ -1,0 +1,22 @@
+{
+  "env": {
+    "AWS_CONFIG_FILE": "/home/YOUR_USER/.aws/agent-config",
+    "AWS_PROFILE": "agent-builder"
+  },
+  "permissions": {
+    "disableBypassPermissionsMode": "disable"
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "network": {
+      "allowedDomains": ["*.amazonaws.com"]
+    },
+    "credentials": {
+      "files": [
+        { "path": "~/.aws/sso/cache/ADMIN_SESSION_TOKEN_FILE.json", "mode": "deny" }
+      ]
+    }
+  }
+}
