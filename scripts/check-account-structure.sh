@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Check the account-structure spec's scenarios against the real organization:
-# each agent permission set is assigned to the agent account and no other.
+# each agent permission set is assigned to the agent account and no other, so
+# never to the management or production account.
 # Prints which accounts each permission set is provisioned to, and exits 1 on a mismatch.
 set -euo pipefail
 cd "$(dirname "$0")/.."
