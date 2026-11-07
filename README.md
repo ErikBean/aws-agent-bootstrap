@@ -1,8 +1,8 @@
 # aws-agent-bootstrap
 
-Specs and code for setting up an AWS account so one developer can let AI coding agents, such as Claude Code, create things in it without surprise costs, security holes or a mess to clean up.
+Requirements and account-level setup for an AWS account where one developer lets AI coding agents, such as Claude Code, create things without surprise costs, security holes or a mess to clean up.
 
-The goal is that starting over with a fresh AWS account is a deploy plus a short runbook.
+It's a reference for other projects and tools. The specs say what a safe agent account and machine look like. The code here sets up the account itself, once per account. Setting up each project repo, such as its deploy role and CI, is done by the `factory-repo-setup` skill in [ErikBean/factory-skills](https://github.com/ErikBean/factory-skills), following these specs. There's no app code here.
 
 - Requirements: [`openspec/specs/`](openspec/specs)
 - Research and decisions behind them: [ErikBean/research](https://github.com/ErikBean/research/tree/main/knowledge/tech/aws-agent-guardrails)

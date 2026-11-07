@@ -1,10 +1,12 @@
 schema: spec-driven
 
 context: |
-  What this repo is: the specs and code that set up an AWS account for one
-  developer to let AI coding agents work in it, without surprise costs,
-  security holes or a mess to clean up. Starting over with a new account
-  should be a deploy plus a short runbook.
+  What this repo is: requirements for an AWS account, and the developer's
+  machine, where one developer lets AI coding agents work without surprise
+  costs, security holes or a mess to clean up, plus the code that sets up the
+  account itself. Per-repo setup follows these specs from the factory-repo-setup
+  skill in ErikBean/factory-skills. There's no app code here. Starting over with
+  a new account should be this repo's deploys plus a short runbook.
 
   The research and decisions behind each requirement live in
   https://github.com/ErikBean/research, under knowledge/tech/aws-agent-guardrails/

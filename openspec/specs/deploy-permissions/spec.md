@@ -12,7 +12,7 @@ The boundary is referred to here as the agent boundary. Its name and account ID 
 
 ### Requirement: An owned agent boundary with anti-escape rules
 
-The agent account SHALL have a customer managed policy, the agent boundary, maintained by this repo's code. Starting from the AWS CDK's example boundary, it SHALL deny:
+The agent account SHALL have a customer managed policy, the agent boundary, maintained by the account-level setup, not by any app. Starting from the AWS CDK's example boundary, it SHALL deny:
 
 - creating an IAM role or user unless the agent boundary is its permissions boundary
 - setting any permissions boundary other than the agent boundary on a role or user
@@ -44,7 +44,7 @@ Reasoning: by default CDK's execution role has `AdministratorAccess` with no bou
 
 #### Scenario: Re-bootstrapping
 
-- **WHEN** the agent account is bootstrapped again through this repo's code
+- **WHEN** the agent account is bootstrapped again through the account-level setup
 - **THEN** the bootstrap roles still carry the agent boundary
 
 ### Requirement: CDK apps attach the boundary to the roles they create

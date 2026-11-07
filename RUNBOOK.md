@@ -21,7 +21,7 @@ This implements [`account-structure`](openspec/specs/account-structure/spec.md):
    | `ORGANIZATION_ROOT_ID` | `aws organizations list-roots --query "Roots[0].Id"` |
    | `IDENTITY_CENTER_INSTANCE_ARN` | `aws sso-admin list-instances --query "Instances[0].InstanceArn"` |
    | `BUILDER_PERMISSION_SET_ARN`, `READONLY_PERMISSION_SET_ARN` | `aws sso-admin list-permission-sets --instance-arn <instance-arn>`, then `aws sso-admin describe-permission-set` on each to find `Agent-Builder` and `Agent-ReadOnly` |
-   | `PRINCIPAL_ID` | `aws identitystore list-users --identity-store-id <store-id>`, where the store ID is in `list-instances` |
+   | `PRINCIPAL_ID` | `aws identitystore list-users --identity-store-id <store-id>`, where the store ID is in `list-instances`. Use the dedicated agent user's ID, not your own; see [`agent-client`](openspec/specs/agent-client/spec.md) |
 
    `AGENT_ACCOUNT_EMAIL` must be an address no other AWS account uses. A plus-address of an inbox you already read works.
 

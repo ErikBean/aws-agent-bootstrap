@@ -3,7 +3,7 @@
 This repo sets up an AWS account so AI coding agents can work in it safely. It holds:
 
 - `openspec/`: requirements as [OpenSpec](https://github.com/Fission-AI/OpenSpec) specs. `specs/` is what the account must look like now; `changes/` holds proposed changes.
-- The code that builds the account, once its specs are settled.
+- The code that sets up the account itself, such as the agent account and its organization policies. Per-repo setup, and app code, live elsewhere, chiefly in the `factory-repo-setup` skill in ErikBean/factory-skills.
 - `RUNBOOK.md`, once there are steps that can't be automated.
 
 ## Research lives elsewhere
