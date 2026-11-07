@@ -66,3 +66,33 @@ The value must be at least the number of accounts already in the organization pl
 6. **Point local profiles at the agent account.** In `~/.aws/config`, set `sso_account_id` in the agent profiles to the new account's ID, from the stack's `AgentAccountId` output. Add admin profiles for the agent and production accounts, using the `Admin` role and the `AgentAccountId` and `ProductionAccountId` outputs.
 
 The new accounts' root users have no password. Leave it that way. Use the management account's admin role or `OrganizationAccountAccessRole` if you ever need admin access without Identity Center.
+
+## Put CDK deploys under the agent boundary
+
+This implements [`deploy-permissions`](openspec/specs/deploy-permissions/spec.md) in both member accounts. Run it after the accounts exist and your admin profiles point at them.
+
+1. **Deploy the boundary and bootstrap CDK** in each member account:
+
+   ```bash
+   scripts/deploy-agent-boundary.sh <agent-account-admin-profile>
+   scripts/deploy-agent-boundary.sh <production-account-admin-profile>
+   ```
+
+   This creates the `agent-boundary` policy, then deploys the `CDKToolkit` stack from the pinned template in `infra/cdk-bootstrap-template.yaml`, with the boundary on all bootstrap roles. Running it again re-bootstraps with the same settings. Don't run `cdk bootstrap` against these accounts without `--custom-permissions-boundary agent-boundary --apply-permissions-boundary-to-all-roles`, because it would drop the boundary from the roles.
+
+2. **Test and attach the SCP**, from the management account:
+
+   ```bash
+   scripts/deploy-scp-agent-boundary.sh
+   ```
+
+   It runs `scripts/test-scp-agent-boundary.sh` first, which simulates the SCP against the cases the spec names, and attaches the SCP to the `Agents` and `Production` OUs only if every case passes. You can run the test on its own at any time.
+
+3. **Check** each member account:
+
+   ```bash
+   scripts/check-deploy-permissions.sh <agent-account-admin-profile>
+   scripts/check-deploy-permissions.sh <production-account-admin-profile>
+   ```
+
+   It confirms every bootstrap role carries the boundary, then tries to create a role without the boundary and expects it to be denied. Run it only after step 2, because before the SCP is attached your admin role is allowed to create that role. If it ever succeeds, the script deletes the role and reports a failure.
