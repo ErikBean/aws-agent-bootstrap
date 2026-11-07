@@ -26,6 +26,15 @@ Reasoning: a cached Identity Center token can likely obtain credentials for ever
 - **WHEN** an agent requests credentials for an admin permission set with its cached token
 - **THEN** the request fails, because the agent user has no such assignment
 
+### Requirement: Agent sessions are short
+
+The agent permission sets SHALL have a session duration of 4 hours, so credentials from them stop working within 4 hours.
+
+#### Scenario: Reading the session duration
+
+- **WHEN** the session duration of the builder or view-only permission set is read
+- **THEN** it is 4 hours (`PT4H`)
+
 ### Requirement: The developer's admin session isn't left signed in
 
 The developer SHALL sign out of their own Identity Center session (`aws sso logout`) when they finish administration, so no token for a user with admin assignments is in the cache while agents run. The runbook SHALL say so.
@@ -68,3 +77,24 @@ Claude Code SHALL set `permissions.disableBypassPermissionsMode` to `"disable"`.
 
 - **WHEN** Claude Code is started with `--dangerously-skip-permissions`
 - **THEN** bypass mode isn't available
+
+### Requirement: AWS credentials stay out of transcripts
+
+Claude Code SHALL deny reading files under `~/.aws` with its file tools and recognized file commands, and SHALL deny running `aws configure export-credentials`, `aws sso get-role-credentials` and `aws sts get-session-token`. The AWS CLI SHALL still be able to use its own config and token cache.
+
+Reasoning: Read deny rules cover Claude's file tools and commands such as `cat`, but not programs that open files themselves ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/claude-code-read-deny-scope.md)). These rules stop accidental exposure; they aren't a security boundary. Credential masking isn't required, for the reasons in the decision.
+
+#### Scenario: Claude tries to read the token cache
+
+- **WHEN** Claude reads or runs `cat` on a file under `~/.aws/sso/cache`
+- **THEN** the read is denied and nothing from the file reaches the transcript
+
+#### Scenario: Claude runs a command that prints credentials
+
+- **WHEN** Claude runs `aws configure export-credentials`
+- **THEN** Claude Code denies the command
+
+#### Scenario: The AWS CLI still works
+
+- **WHEN** Claude runs `aws sts get-caller-identity` with the agent profile
+- **THEN** it succeeds, using the cached sign-in

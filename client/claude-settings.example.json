@@ -4,18 +4,29 @@
     "AWS_PROFILE": "agent-builder"
   },
   "permissions": {
-    "disableBypassPermissionsMode": "disable"
+    "disableBypassPermissionsMode": "disable",
+    "deny": [
+      "Read(~/.aws/**)",
+      "Bash(aws configure export-credentials *)",
+      "Bash(aws sso get-role-credentials *)",
+      "Bash(aws sts get-session-token *)"
+    ]
   },
   "sandbox": {
     "enabled": true,
     "failIfUnavailable": true,
     "allowUnsandboxedCommands": false,
     "network": {
-      "allowedDomains": ["*.amazonaws.com"]
+      "allowedDomains": [
+        "*.amazonaws.com"
+      ]
     },
     "credentials": {
       "files": [
-        { "path": "~/.aws/sso/cache/ADMIN_SESSION_TOKEN_FILE.json", "mode": "deny" }
+        {
+          "path": "~/.aws/sso/cache/ADMIN_SESSION_TOKEN_FILE.json",
+          "mode": "deny"
+        }
       ]
     }
   }
