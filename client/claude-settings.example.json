@@ -6,10 +6,13 @@
   "permissions": {
     "disableBypassPermissionsMode": "disable",
     "deny": [
-      "Read(~/.aws/**)",
       "Bash(aws configure export-credentials *)",
       "Bash(aws sso get-role-credentials *)",
       "Bash(aws sts get-session-token *)"
+    ],
+    "ask": [
+      "Read(~/.aws/**)",
+      "Bash(*.aws/*)"
     ]
   },
   "sandbox": {

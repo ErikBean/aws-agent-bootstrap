@@ -80,21 +80,21 @@ Claude Code SHALL set `permissions.disableBypassPermissionsMode` to `"disable"`.
 
 ### Requirement: AWS credentials stay out of transcripts
 
-Claude Code SHALL deny reading files under `~/.aws` with its file tools and recognized file commands, and SHALL deny running `aws configure export-credentials`, `aws sso get-role-credentials` and `aws sts get-session-token`. The AWS CLI SHALL still be able to use its own config and token cache.
+Claude Code SHALL deny running `aws configure export-credentials`, `aws sso get-role-credentials` and `aws sts get-session-token`. It SHALL ask before reading files under `~/.aws`, through its Read tool (`Read(~/.aws/**)`) or a shell command that names them (`Bash(*.aws/*)`). The AWS CLI SHALL still be able to use its own config and token cache inside the sandbox.
 
-Reasoning: Read deny rules cover Claude's file tools and commands such as `cat`, but not programs that open files themselves ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/claude-code-read-deny-scope.md)). These rules stop accidental exposure; they aren't a security boundary. Credential masking isn't required, for the reasons in the decision.
+These SHALL be ask rules, not deny rules. With the sandbox on, Claude Code adds Read deny rules to the sandbox's read blocks, which would stop the AWS CLI reading its own files ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/claude-code-read-deny-scope.md)). A test on Claude Code 2.1.309 showed the Read ask rule alone doesn't stop `cat`, so the Bash ask rule is needed too ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/claude-code-ask-rules-for-credentials-test.md)). These rules stop accidental exposure; they aren't a security boundary. Credential masking isn't required, for the reasons in the decision.
 
-#### Scenario: Claude tries to read the token cache
+#### Scenario: Claude reads a file under ~/.aws
 
-- **WHEN** Claude reads or runs `cat` on a file under `~/.aws/sso/cache`
-- **THEN** the read is denied and nothing from the file reaches the transcript
+- **WHEN** Claude reads a file under `~/.aws` with its Read tool, or runs `cat` or `head` on one
+- **THEN** Claude Code asks the developer first, and nothing from the file reaches the transcript unless they approve
 
 #### Scenario: Claude runs a command that prints credentials
 
 - **WHEN** Claude runs `aws configure export-credentials`
 - **THEN** Claude Code denies the command
 
-#### Scenario: The AWS CLI still works
+#### Scenario: The AWS CLI still works in the sandbox
 
-- **WHEN** Claude runs `aws sts get-caller-identity` with the agent profile
+- **WHEN** Claude runs `aws sts get-caller-identity` with the agent profile in a sandboxed command
 - **THEN** it succeeds, using the cached sign-in
