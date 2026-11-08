@@ -44,7 +44,6 @@ Resources:
               - cloudformation:Describe*
               - cloudformation:Get*
               - cloudformation:List*
-              - lambda:Describe*
               - lambda:Get*
               - lambda:List*
               - dynamodb:Describe*
@@ -56,8 +55,8 @@ Resources:
               - cloudfront:Describe*
               - cloudfront:Get*
               - cloudfront:List*
-              - apigateway:Describe*
               - apigateway:Get*
+              - apigateway:GET
               - apigateway:List*
               - logs:Describe*
               - logs:Get*
@@ -65,13 +64,10 @@ Resources:
               - cloudwatch:Describe*
               - cloudwatch:Get*
               - cloudwatch:List*
-              - iam:Describe*
               - iam:Get*
               - iam:List*
-              - sqs:Describe*
               - sqs:Get*
               - sqs:List*
-              - sns:Describe*
               - sns:Get*
               - sns:List*
               - events:Describe*
@@ -99,7 +95,6 @@ Resources:
               - tag:Get*
               - tag:List*
               - budgets:Describe*
-              - budgets:Get*
               - budgets:List*
               - ce:Describe*
               - ce:Get*
