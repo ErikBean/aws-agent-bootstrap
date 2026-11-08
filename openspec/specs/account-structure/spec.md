@@ -47,13 +47,29 @@ Reasoning: [decision](https://github.com/ErikBean/research/blob/main/knowledge/p
 - **WHEN** a pull request to an app's repo passes CI and is merged to its default branch
 - **THEN** the app's CI deploy role deploys it to the production account
 
+### Requirement: Pull request previews run in a separate preview account
+
+The organization SHALL include one member account for pull request previews, referred to here as the preview account. Only CI SHALL deploy to it, through each app's preview deploy role. The agent user SHALL have only the Agent-ReadOnly permission set there, so agents can read logs and stack events but can't change a preview. Agent-Builder SHALL NOT be assigned to it.
+
+Reasoning: [decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/app-environments.md).
+
+#### Scenario: An agent tries to change a preview
+
+- **WHEN** an agent signs in to the preview account and tries to update a preview's stack or resources
+- **THEN** it can only sign in with Agent-ReadOnly, and the change is denied
+
+#### Scenario: An agent debugs a failed preview
+
+- **WHEN** an agent reads a preview stack's events and its Lambda function's logs
+- **THEN** the reads succeed
+
 ### Requirement: The developer can administer the member accounts
 
-The developer's admin permission set SHALL be assigned to the agent account and the production account, so that setup steps such as CDK bootstrap can run there without root credentials. It SHALL be assigned to the developer's own Identity Center user, never to the agent user, because a cached token can reach every role assigned to its user ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/sso-token-reaches-every-assigned-role.md)).
+The developer's admin permission set SHALL be assigned to every member account: the agent, preview and production accounts, so that setup steps such as CDK bootstrap can run there without root credentials. It SHALL be assigned to the developer's own Identity Center user, never to the agent user, because a cached token can reach every role assigned to its user ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/sso-token-reaches-every-assigned-role.md)).
 
 #### Scenario: The developer bootstraps CDK
 
-- **WHEN** the developer signs in to the agent or production account with the admin permission set
+- **WHEN** the developer signs in to a member account with the admin permission set
 - **THEN** they can deploy CloudFormation stacks and create IAM roles there, subject to the account's SCPs
 
 #### Scenario: The agent user lists its roles
@@ -63,11 +79,11 @@ The developer's admin permission set SHALL be assigned to the agent account and 
 
 ### Requirement: The member accounts are governed by the organization
 
-The agent account and the production account SHALL be members of the developer's organization, each in its own organizational unit, so that service control policies attached to them, or to their organizational units, apply to every user and role in them.
+The agent, preview and production accounts SHALL be members of the developer's organization, each in its own organizational unit, so that service control policies attached to them, or to their organizational units, apply to every user and role in them.
 
 Reasoning: SCPs don't affect the management account, only member accounts ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/scps-skip-management-account.md)).
 
 #### Scenario: An SCP applies to a member account
 
-- **WHEN** an SCP that denies an action is attached to the agent or production account, or to its organizational unit
+- **WHEN** an SCP that denies an action is attached to a member account, or to its organizational unit
 - **THEN** a request for that action from any role in that account, including an agent's or a CI deploy role's, is denied

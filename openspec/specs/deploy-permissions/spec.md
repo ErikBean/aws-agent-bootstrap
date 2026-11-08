@@ -2,7 +2,7 @@
 
 ## Purpose
 
-What a deploy can create when it runs with the AWS CDK in a member account: the agent account, where agents deploy, and the production account, where CI deploys. Deploys work, but everything they run as or create is capped by one permissions boundary that nothing in the account can remove or weaken.
+What a deploy can create when it runs with the AWS CDK in a member account: the agent account, where agents deploy, the preview account, where CI deploys pull request previews, and the production account, where CI deploys. Deploys work, but everything they run as or create is capped by one permissions boundary that nothing in the account can remove or weaken.
 
 Reasoning: [decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/cdk-deploys-under-permissions-boundary.md), which links the research behind it. It covers the production account too, because [production apps deploy there through CDK](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/production-in-shared-account.md).
 

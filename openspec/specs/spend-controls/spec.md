@@ -2,7 +2,7 @@
 
 ## Purpose
 
-How spending in the member accounts, the agent and production accounts, is limited. Always-on SCPs block expensive things outright, with no billing delay. A monthly budget reacts to the bill and, at its limit, stops new resources automatically until the developer reverses it.
+How spending in the member accounts, the agent, preview and production accounts, is limited. Always-on SCPs block expensive things outright, with no billing delay. A monthly budget reacts to the bill and, at its limit, stops new resources automatically until the developer reverses it.
 
 Reasoning: [decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/spend-controls.md), which links the research behind it, and the [production account decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/production-account-guardrails.md).
 
@@ -70,18 +70,18 @@ Reasoning: they bill whether or not anything uses them, and a NAT gateway alone 
 
 ### Requirement: A $10 monthly budget with alerts
 
-The agent account and the production account SHALL each have a monthly cost budget of $10, with email alerts to the developer at $5 actual and $8 forecasted spend.
+The agent, preview and production accounts SHALL each have a monthly cost budget of $10, with email alerts to the developer at $5 actual and $8 forecasted spend.
 
 #### Scenario: Forecast passes $8
 
 - **WHEN** forecasted spend for the month passes $8
 - **THEN** the developer gets an email
 
-### Requirement: The agent account's budget stops new resources automatically, and the developer can reverse it
+### Requirement: The agent and preview accounts' budgets stop new resources automatically, and the developer can reverse them
 
-When the agent account's actual spend passes $10, a budget action SHALL attach a deny SCP to the agent account automatically, without waiting for approval. While it is attached, roles in the agent account SHALL NOT be able to create or start resources, and SHALL still be able to read and delete them. The developer SHALL be able to remove the deny by reversing the action in AWS Budgets.
+When the agent or preview account's actual spend passes $10, a budget action SHALL attach a deny SCP to that account automatically, without waiting for approval. While it is attached, roles in that account SHALL NOT be able to create or start resources, and SHALL still be able to read and delete them. The developer SHALL be able to remove the deny by reversing the action in AWS Budgets.
 
-Reasoning: [finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/budget-action-approval-and-reversal.md). Budgets reacts hours after spending, so the cutoff lands above $10 ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/budgets-lag-behind-usage.md)). Reversing removes the cap for the rest of the month; to allow a higher ceiling, raise the budget instead.
+Reasoning: [finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/budget-action-approval-and-reversal.md). Budgets reacts hours after spending, so the cutoff lands above $10 ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/budgets-lag-behind-usage.md)). Reversing removes the cap for the rest of the month; to allow a higher ceiling, raise the budget instead. Previews aren't live apps, so the preview account gets the deny too ([decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/app-environments.md)).
 
 Untested: AWS says SCP-type actions reset at the start of each budget period, but not whether that detaches the deny SCP. This must be tested in the agent account, and the runbook must say what to do on the 1st of the month.
 
