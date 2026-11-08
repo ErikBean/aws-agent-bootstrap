@@ -10,6 +10,6 @@ It's a reference for other projects and tools. The specs say what a safe agent a
 - Code: [`infra/`](infra) holds the CloudFormation templates, deployed by the scripts in [`scripts/`](scripts). Real account values are read from gitignored config in `config.local/`.
 - Manual steps: [`RUNBOOK.md`](RUNBOOK.md)
 
-Status: the agent account ([`account-structure`](openspec/specs/account-structure/spec.md)) has code. The other specs don't yet.
+Status: the agent and production accounts ([`account-structure`](openspec/specs/account-structure/spec.md)) have code. The other specs don't yet.
 
 This repo is public and contains no values from a real account. See [AGENTS.md](AGENTS.md) for how that is kept true.
