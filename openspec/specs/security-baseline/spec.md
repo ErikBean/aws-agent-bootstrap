@@ -2,19 +2,19 @@
 
 ## Purpose
 
-The free or nearly free security controls on the organization and the agent account: an audit trail, checks for external access, public-access settings that the agent account can't change, and a resource perimeter that keeps other AWS accounts out of the agent account's resources.
+The free or nearly free security controls on the organization and its member accounts, the agent and production accounts: an audit trail, checks for external access, public-access settings that the agent account can't change, and a resource perimeter that keeps other AWS accounts out of the agent account's resources.
 
-Reasoning: [decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/security-baseline.md), which links the research behind it.
+Reasoning: [decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/security-baseline.md), which links the research behind it, and the [production account decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/production-account-guardrails.md).
 
 ## Requirements
 
 ### Requirement: Root users are protected
 
-The management account's root user SHALL have MFA registered. The agent account SHALL have no root user credentials.
+The management account's root user SHALL have MFA registered. Neither member account SHALL have root user credentials.
 
-#### Scenario: Checking the agent account's root user
+#### Scenario: Checking a member account's root user
 
-- **WHEN** the root credential status of the agent account is checked from the management account
+- **WHEN** the root credential status of a member account is checked from the management account
 - **THEN** it has no password, access keys or MFA device
 
 ### Requirement: An organization trail records all management events
@@ -35,16 +35,16 @@ Reasoning: managing the trail and its bucket counts as organization administrati
 
 ### Requirement: External access is reported
 
-The agent account SHALL have an IAM Access Analyzer external access analyzer.
+Each member account SHALL have an IAM Access Analyzer external access analyzer.
 
 #### Scenario: An agent shares a bucket outside the organization
 
-- **WHEN** a resource in the agent account is made accessible to a principal outside the organization
+- **WHEN** a resource in a member account is made accessible to a principal outside the organization
 - **THEN** Access Analyzer reports a finding
 
 ### Requirement: Public-access settings are locked
 
-Declarative policies SHALL apply to the agent account:
+Declarative policies SHALL apply to both member accounts:
 
 - an Amazon S3 policy turning on all four S3 Block Public Access settings
 - an EC2 policy setting VPC Block Public Access to block inbound internet traffic (`block_ingress`), blocking new public sharing of AMIs, and blocking public sharing of EBS snapshots
@@ -61,9 +61,9 @@ Declarative policies SHALL apply to the agent account:
 
 ### Requirement: Resources accept only principals from the organization
 
-The agent account SHALL have a resource control policy based on AWS's identity-perimeter example, with its `EnforceOrgIdentities` and `EnforceConfusedDeputyProtection` statements, the organization's ID, and no trusted third-party accounts. A statement limiting `sts:AssumeRoleWithWebIdentity` to the developer's own tenant SHALL be added before any OIDC deploy role, such as one for GitHub Actions, is created.
+Each member account SHALL have a resource control policy based on AWS's identity-perimeter example, with its `EnforceOrgIdentities` and `EnforceConfusedDeputyProtection` statements, the organization's ID, and no trusted third-party accounts. A statement limiting `sts:AssumeRoleWithWebIdentity` to the developer's own tenant SHALL be added before any OIDC deploy role, such as one for GitHub Actions, is created.
 
-The RCP SHALL be attached while the agent account has no workloads, and tested then, because the IAM policy simulator doesn't support RCPs.
+The RCP SHALL be attached to each member account while it has no workloads, and tested then, because the IAM policy simulator doesn't support RCPs.
 
 Reasoning: [finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/identity-perimeter-rcp-pattern.md).
 
