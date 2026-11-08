@@ -52,7 +52,6 @@ Resources:
               - cloudfront:Get*
               - cloudfront:List*
               - apigateway:Get*
-              - apigateway:GET
               - apigateway:List*
               - logs:Describe*
               - logs:Get*
