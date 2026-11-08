@@ -1,0 +1,57 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  SCP that backs up the agent boundary's anti-escape rules in the member
+  accounts. Deploy in the management account, only after
+  scripts/test-scp-agent-boundary.sh passes. Implements the "An SCP backs up the
+  anti-escape rules" requirement in openspec/specs/deploy-permissions/spec.md.
+
+Parameters:
+  TargetIds:
+    Type: CommaDelimitedList
+    Description: The OUs to attach the SCP to, from the account-structure stack's outputs.
+
+Resources:
+  AgentBoundaryScp:
+    Type: AWS::Organizations::Policy
+    Properties:
+      Name: agent-boundary-backstop
+      Description: Denies creating roles or users without the agent boundary, editing the boundary, and removing boundaries.
+      Type: SERVICE_CONTROL_POLICY
+      TargetIds: !Ref TargetIds
+      Content:
+        Version: "2012-10-17"
+        Statement:
+          # No exemption: not even an administrator can create an unbounded role.
+          - Sid: DenyRoleOrUserCreationWithoutAgentBoundary
+            Effect: Deny
+            Action:
+              - iam:CreateUser
+              - iam:CreateRole
+              - iam:PutRolePermissionsBoundary
+              - iam:PutUserPermissionsBoundary
+            Resource: "*"
+            Condition:
+              StringNotLike:
+                iam:PermissionsBoundary: arn:aws:iam::*:policy/agent-boundary
+          # The Admin permission set may change the boundary, through its stack.
+          - Sid: DenyAgentBoundaryAlterationExceptByAdmin
+            Effect: Deny
+            Action:
+              - iam:CreatePolicyVersion
+              - iam:DeletePolicy
+              - iam:DeletePolicyVersion
+              - iam:SetDefaultPolicyVersion
+            Resource: arn:aws:iam::*:policy/agent-boundary
+            Condition:
+              ArnNotLike:
+                aws:PrincipalArn: arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_Admin_*
+          - Sid: DenyBoundaryRemoval
+            Effect: Deny
+            Action:
+              - iam:DeleteUserPermissionsBoundary
+              - iam:DeleteRolePermissionsBoundary
+            Resource: "*"
+
+Outputs:
+  PolicyId:
+    Value: !Ref AgentBoundaryScp
