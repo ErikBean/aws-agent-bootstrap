@@ -1,0 +1,226 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Monthly budgets for the member accounts. The agent account's budget attaches a
+  deny SCP automatically at $10; the developer reverses it in AWS Budgets. The
+  production account's budget only alerts. Deploy in the management account,
+  only after scripts/test-scp-budget-deny.sh passes. Implements the budget
+  requirements in openspec/specs/spend-controls/spec.md.
+
+Parameters:
+  AgentAccountId:
+    Type: String
+    AllowedPattern: "^[0-9]{12}$"
+  ProductionAccountId:
+    Type: String
+    AllowedPattern: "^[0-9]{12}$"
+  AlertEmail:
+    Type: String
+    Description: Where budget alerts go. Comes from local config, never from this repo.
+  MonthlyLimitUsd:
+    Type: Number
+    Default: 10
+
+Resources:
+  # Attached only by the budget action, never by a deploy. While attached, the
+  # people and deploys that change the agent account can read and delete but not
+  # create, start or update anything. App roles aren't matched, so running apps
+  # keep working.
+  BudgetDenyScp:
+    Type: AWS::Organizations::Policy
+    Properties:
+      Name: budget-deny-new-resources
+      Description: Applied by the agent account's budget action. Allows only reads and deletes for Identity Center and CDK roles.
+      Type: SERVICE_CONTROL_POLICY
+      Content:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyChangesExceptReadAndDelete
+            Effect: Deny
+            NotAction:
+              - cloudformation:Describe*
+              - cloudformation:Get*
+              - cloudformation:List*
+              - lambda:Describe*
+              - lambda:Get*
+              - lambda:List*
+              - dynamodb:Describe*
+              - dynamodb:Get*
+              - dynamodb:List*
+              - s3:Describe*
+              - s3:Get*
+              - s3:List*
+              - cloudfront:Describe*
+              - cloudfront:Get*
+              - cloudfront:List*
+              - apigateway:Describe*
+              - apigateway:Get*
+              - apigateway:List*
+              - logs:Describe*
+              - logs:Get*
+              - logs:List*
+              - cloudwatch:Describe*
+              - cloudwatch:Get*
+              - cloudwatch:List*
+              - iam:Describe*
+              - iam:Get*
+              - iam:List*
+              - sqs:Describe*
+              - sqs:Get*
+              - sqs:List*
+              - sns:Describe*
+              - sns:Get*
+              - sns:List*
+              - events:Describe*
+              - events:Get*
+              - events:List*
+              - states:Describe*
+              - states:Get*
+              - states:List*
+              - cognito-idp:Describe*
+              - cognito-idp:Get*
+              - cognito-idp:List*
+              - secretsmanager:Describe*
+              - secretsmanager:Get*
+              - secretsmanager:List*
+              - ssm:Describe*
+              - ssm:Get*
+              - ssm:List*
+              - ecr:Describe*
+              - ecr:Get*
+              - ecr:List*
+              - ec2:Describe*
+              - ec2:Get*
+              - ec2:List*
+              - tag:Describe*
+              - tag:Get*
+              - tag:List*
+              - budgets:Describe*
+              - budgets:Get*
+              - budgets:List*
+              - ce:Describe*
+              - ce:Get*
+              - ce:List*
+              - cloudformation:DeleteStack
+              - cloudformation:DeleteChangeSet
+              - lambda:Delete*
+              - lambda:RemovePermission
+              - dynamodb:DeleteTable
+              - dynamodb:Scan
+              - dynamodb:Query
+              - s3:Delete*
+              - cloudfront:Delete*
+              - cloudfront:UpdateDistribution
+              - apigateway:DELETE
+              - logs:Delete*
+              - logs:FilterLogEvents
+              - logs:StartQuery
+              - logs:StopQuery
+              - iam:DeleteRole
+              - iam:DeleteRolePolicy
+              - iam:DetachRolePolicy
+              - iam:DeletePolicy
+              - iam:DeletePolicyVersion
+              - iam:RemoveRoleFromInstanceProfile
+              - iam:DeleteInstanceProfile
+              - sqs:DeleteQueue
+              - sns:DeleteTopic
+              - sns:Unsubscribe
+              - events:Delete*
+              - events:RemoveTargets
+              - states:DeleteStateMachine
+              - states:StopExecution
+              - cognito-idp:Delete*
+              - secretsmanager:DeleteSecret
+              - ssm:DeleteParameter
+              - ssm:DeleteParameters
+              - ecr:Delete*
+              - ecr:BatchDeleteImage
+              - ec2:Delete*
+              - ec2:TerminateInstances
+              - ec2:ReleaseAddress
+              - ec2:StopInstances
+              - sts:*
+              - sso:*
+            Resource: "*"
+            Condition:
+              ArnLike:
+                aws:PrincipalArn:
+                  - arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*
+                  - arn:aws:iam::*:role/cdk-*
+
+  # AWS Budgets assumes this role to attach and detach the SCP. Permissions from
+  # AWS's example policy for budget actions that apply SCPs.
+  BudgetsActionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: budgets.amazonaws.com }
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: apply-budget-deny-scp
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - organizations:AttachPolicy
+                  - organizations:DetachPolicy
+                Resource: "*"
+
+  AgentBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: agent-account-monthly
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit: { Amount: !Ref MonthlyLimitUsd, Unit: USD }
+        CostFilters:
+          LinkedAccount: [!Ref AgentAccountId]
+      NotificationsWithSubscribers:
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 5, ThresholdType: ABSOLUTE_VALUE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: FORECASTED, ComparisonOperator: GREATER_THAN, Threshold: 8, ThresholdType: ABSOLUTE_VALUE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: !Ref MonthlyLimitUsd, ThresholdType: ABSOLUTE_VALUE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+
+  AgentBudgetDenyAction:
+    Type: AWS::Budgets::BudgetsAction
+    Properties:
+      BudgetName: !Ref AgentBudget
+      NotificationType: ACTUAL
+      ActionType: APPLY_SCP_POLICY
+      ActionThreshold: { Type: ABSOLUTE_VALUE, Value: !Ref MonthlyLimitUsd }
+      ApprovalModel: AUTOMATIC
+      ExecutionRoleArn: !GetAtt BudgetsActionRole.Arn
+      Definition:
+        ScpActionDefinition:
+          PolicyId: !Ref BudgetDenyScp
+          TargetIds: [!Ref AgentAccountId]
+      Subscribers: [{ Type: EMAIL, Address: !Ref AlertEmail }]
+
+  # No budget action: a deny would break live apps.
+  ProductionBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: production-account-monthly
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit: { Amount: !Ref MonthlyLimitUsd, Unit: USD }
+        CostFilters:
+          LinkedAccount: [!Ref ProductionAccountId]
+      NotificationsWithSubscribers:
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 5, ThresholdType: ABSOLUTE_VALUE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: FORECASTED, ComparisonOperator: GREATER_THAN, Threshold: 8, ThresholdType: ABSOLUTE_VALUE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: !Ref MonthlyLimitUsd, ThresholdType: ABSOLUTE_VALUE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]

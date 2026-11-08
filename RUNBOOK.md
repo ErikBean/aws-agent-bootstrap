@@ -111,3 +111,30 @@ scripts/apply-agent-permissions.sh
 ```
 
 It runs `scripts/test-agent-permissions.sh` first, which simulates `PowerUserAccess` plus the inline policy against the spec's scenarios, and applies the policy only if every case passes. It then sets both `Agent-Builder` and `Agent-ReadOnly` to 4-hour sessions, as [`agent-client`](openspec/specs/agent-client/spec.md) requires, reprovisions them to every account they're assigned to, and prints each one's name and session duration. To allow another service, change the spec first, then the `iam:PassedToService` list in the policy.
+
+## Set up the spend controls
+
+This implements [`spend-controls`](openspec/specs/spend-controls/spec.md). Run both from the management account, after the account-structure stack exists. Add `BUDGET_ALERT_EMAIL` to `config.local/account-structure.env` first.
+
+1. **The always-on SCP.** It limits both member accounts to `us-east-1` and `us-west-2`, and denies EC2 instances, Bedrock model use and the fixed-cost services:
+
+   ```bash
+   scripts/deploy-scp-spend-controls.sh
+   ```
+
+   It runs `scripts/test-scp-spend-controls.sh` first: Access Analyzer's policy validation, then simulator cases for each scenario in the spec. It deploys only if both pass. If a global service you need is ever denied outside the two Regions, add it to the `NotAction` list in `infra/scp-spend-controls.yaml`.
+
+2. **The budgets.** A $10 monthly budget for each member account, with alerts at $5 actual, $8 forecasted and $10 actual. The agent account's budget also has an automatic action that attaches `budget-deny-new-resources`:
+
+   ```bash
+   scripts/deploy-budgets.sh
+   ```
+
+   It runs `scripts/test-scp-budget-deny.sh` first. While that SCP is attached, your Identity Center roles and CDK's roles in the agent account can read and delete, including `cdk destroy`, but can't create, start or update anything. App roles aren't affected, so running apps keep working.
+
+**When the agent account goes over $10:** you get an email, and new work is blocked. To keep going this month, open AWS Budgets → `agent-account-monthly` → the action's history, and choose **Reverse**. Reversing removes the cap for the rest of the month. To allow a higher ceiling instead, raise `MonthlyLimitUsd` and redeploy.
+
+**Two things to test once the agent account exists**, which no source settles:
+
+- At the start of the next month, check whether `budget-deny-new-resources` is still attached to the agent account (`aws organizations list-policies-for-target --target-id <agent account ID> --filter SERVICE_CONTROL_POLICY`). AWS says SCP actions reset each period, but not whether the reset detaches the policy. Record the answer here.
+- Whether the read and delete list in `infra/budgets.yaml` is enough for `cdk destroy` of a real stack. If a delete is denied, add that action to the list.
