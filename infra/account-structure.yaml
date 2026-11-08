@@ -22,6 +22,12 @@ Parameters:
   ProductionAccountEmail:
     Type: String
     Description: Root email for the production account. It must not be used by any other AWS account.
+  PreviewAccountName:
+    Type: String
+    Default: preview
+  PreviewAccountEmail:
+    Type: String
+    Description: Root email for the preview account. It must not be used by any other AWS account.
   IdentityCenterInstanceArn:
     Type: String
     Description: From `aws sso-admin list-instances`.
@@ -94,6 +100,26 @@ Resources:
       Email: !Ref ProductionAccountEmail
       ParentIds: [!Ref ProductionOu]
 
+  # Pull request previews, deployed only by CI. See
+  # openspec/specs/app-environments/spec.md.
+  PreviewOu:
+    Type: AWS::Organizations::OrganizationalUnit
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: Preview
+      ParentId: !Ref OrganizationRootId
+
+  # Retained for the same reason as the agent account.
+  PreviewAccount:
+    Type: AWS::Organizations::Account
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AccountName: !Ref PreviewAccountName
+      Email: !Ref PreviewAccountEmail
+      ParentIds: [!Ref PreviewOu]
+
   BuilderAssignment:
     Type: AWS::SSO::Assignment
     Properties:
@@ -134,6 +160,28 @@ Resources:
       TargetId: !GetAtt ProductionAccount.AccountId
       TargetType: AWS_ACCOUNT
 
+  # Agents may only read in the preview account, to debug a failed preview.
+  # Agent-Builder is deliberately not assigned there.
+  PreviewReadOnlyAssignment:
+    Type: AWS::SSO::Assignment
+    Properties:
+      InstanceArn: !Ref IdentityCenterInstanceArn
+      PermissionSetArn: !Ref ReadOnlyPermissionSetArn
+      PrincipalId: !Ref AgentPrincipalId
+      PrincipalType: !Ref PrincipalType
+      TargetId: !GetAtt PreviewAccount.AccountId
+      TargetType: AWS_ACCOUNT
+
+  PreviewAccountAdminAssignment:
+    Type: AWS::SSO::Assignment
+    Properties:
+      InstanceArn: !Ref IdentityCenterInstanceArn
+      PermissionSetArn: !Ref AdminPermissionSetArn
+      PrincipalId: !Ref AdminPrincipalId
+      PrincipalType: !Ref PrincipalType
+      TargetId: !GetAtt PreviewAccount.AccountId
+      TargetType: AWS_ACCOUNT
+
 Outputs:
   AgentAccountId:
     Value: !GetAtt AgentAccount.AccountId
@@ -143,3 +191,7 @@ Outputs:
     Value: !GetAtt ProductionAccount.AccountId
   ProductionOuId:
     Value: !Ref ProductionOu
+  PreviewAccountId:
+    Value: !GetAtt PreviewAccount.AccountId
+  PreviewOuId:
+    Value: !Ref PreviewOu

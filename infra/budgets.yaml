@@ -1,13 +1,16 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
-  Monthly budgets for the member accounts. The agent account's budget attaches a
-  deny SCP automatically at $10; the developer reverses it in AWS Budgets. The
+  Monthly budgets for the member accounts. The agent and preview accounts' budgets
+  attach a deny SCP automatically at $10; the developer reverses it in AWS Budgets. The
   production account's budget only alerts. Deploy in the management account,
   only after scripts/test-scp-budget-deny.sh passes. Implements the budget
   requirements in openspec/specs/spend-controls/spec.md.
 
 Parameters:
   AgentAccountId:
+    Type: String
+    AllowedPattern: "^[0-9]{12}$"
+  PreviewAccountId:
     Type: String
     AllowedPattern: "^[0-9]{12}$"
   ProductionAccountId:
@@ -21,8 +24,9 @@ Parameters:
     Default: 10
 
 Resources:
-  # Attached only by the budget action, never by a deploy. While attached, the
-  # people and deploys that change the agent account can read and delete but not
+  # Attached only by the budget actions, never by a deploy. While attached, the
+  # people and deploys that change the agent or preview account, including CI
+  # deploys, which run through CDK's cdk-* roles, can read and delete but not
   # create, start or update anything. App roles aren't matched, so running apps
   # keep working.
   BudgetDenyScp:
@@ -204,6 +208,40 @@ Resources:
         ScpActionDefinition:
           PolicyId: !Ref BudgetDenyScp
           TargetIds: [!Ref AgentAccountId]
+      Subscribers: [{ Type: EMAIL, Address: !Ref AlertEmail }]
+
+  # Previews aren't live apps, so the preview account gets the same deny.
+  PreviewBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: preview-account-monthly
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit: { Amount: !Ref MonthlyLimitUsd, Unit: USD }
+        CostFilters:
+          LinkedAccount: [!Ref PreviewAccountId]
+      NotificationsWithSubscribers:
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 5, ThresholdType: ABSOLUTE_VALUE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: FORECASTED, ComparisonOperator: GREATER_THAN, Threshold: 8, ThresholdType: ABSOLUTE_VALUE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: !Ref MonthlyLimitUsd, ThresholdType: ABSOLUTE_VALUE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+
+  PreviewBudgetDenyAction:
+    Type: AWS::Budgets::BudgetsAction
+    Properties:
+      BudgetName: !Ref PreviewBudget
+      NotificationType: ACTUAL
+      ActionType: APPLY_SCP_POLICY
+      ActionThreshold: { Type: ABSOLUTE_VALUE, Value: !Ref MonthlyLimitUsd }
+      ApprovalModel: AUTOMATIC
+      ExecutionRoleArn: !GetAtt BudgetsActionRole.Arn
+      Definition:
+        ScpActionDefinition:
+          PolicyId: !Ref BudgetDenyScp
+          TargetIds: [!Ref PreviewAccountId]
       Subscribers: [{ Type: EMAIL, Address: !Ref AlertEmail }]
 
   # No budget action: a deny would break live apps.
