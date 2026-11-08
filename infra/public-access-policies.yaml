@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Declarative policies that lock public-access settings in the member accounts,
+  so nothing inside them can turn the settings off. Deploy in the management
+  account. Implements "Public-access settings are locked" in
+  openspec/specs/security-baseline/spec.md.
+
+Parameters:
+  TargetIds:
+    Type: CommaDelimitedList
+    Description: The OUs to attach the policies to, from the account-structure stack's outputs.
+
+Resources:
+  S3BlockPublicAccess:
+    Type: AWS::Organizations::Policy
+    Properties:
+      Name: s3-block-public-access
+      Description: Turns on all four S3 Block Public Access settings.
+      Type: S3_POLICY
+      TargetIds: !Ref TargetIds
+      Content:
+        s3_attributes:
+          public_access_block_configuration:
+            "@@assign": all
+
+  Ec2PublicAccess:
+    Type: AWS::Organizations::Policy
+    Properties:
+      Name: ec2-public-access
+      Description: Blocks inbound internet traffic to VPCs and public sharing of AMIs and EBS snapshots.
+      Type: DECLARATIVE_POLICY_EC2
+      TargetIds: !Ref TargetIds
+      Content:
+        ec2_attributes:
+          vpc_block_public_access:
+            internet_gateway_block:
+              mode:
+                "@@assign": block_ingress
+              exclusions_allowed:
+                "@@assign": disabled
+          image_block_public_access:
+            state:
+              "@@assign": block_new_sharing
+          snapshot_block_public_access:
+            state:
+              "@@assign": block_all_sharing

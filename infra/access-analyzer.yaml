@@ -1,0 +1,13 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  An IAM Access Analyzer external access analyzer, which is free. Deploy in each
+  member account, in each Region the account uses, because analyzers are
+  Regional. Implements "External access is reported" in
+  openspec/specs/security-baseline/spec.md.
+
+Resources:
+  ExternalAccessAnalyzer:
+    Type: AWS::AccessAnalyzer::Analyzer
+    Properties:
+      AnalyzerName: external-access
+      Type: ACCOUNT

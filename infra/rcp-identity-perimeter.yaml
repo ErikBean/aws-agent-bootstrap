@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Resource control policy that keeps principals outside the organization away
+  from the member accounts' resources. Based on AWS data-perimeter-policy-examples, resource_control_policies/identity_perimeter_rcp.json at commit 99ebe50d7497,
+  keeping its EnforceOrgIdentities and EnforceConfusedDeputyProtection
+  statements. Deploy in the management account, only after
+  scripts/test-rcp-identity-perimeter.sh passes, and while the member accounts
+  have no workloads. Implements "Resources accept only principals from the
+  organization" in openspec/specs/security-baseline/spec.md.
+
+Parameters:
+  OrganizationId:
+    Type: String
+    AllowedPattern: "^o-[a-z0-9]{10,32}$"
+  TargetIds:
+    Type: CommaDelimitedList
+    Description: The OUs to attach the RCP to, from the account-structure stack's outputs.
+
+Resources:
+  # Changes from AWS's example: no trusted third-party accounts, and no
+  # dp:exclude:identity tag exemption, because an agent could tag its own
+  # resources to escape the perimeter. Add a GitHub OIDC tenant statement
+  # before creating any OIDC deploy role (see RUNBOOK.md).
+  IdentityPerimeterRcp:
+    Type: AWS::Organizations::Policy
+    Properties:
+      Name: identity-perimeter
+      Description: Denies access to member account resources from principals outside the organization.
+      Type: RESOURCE_CONTROL_POLICY
+      TargetIds: !Ref TargetIds
+      Content:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: EnforceOrgIdentities
+            Effect: Deny
+            Principal: "*"
+            Action:
+              - s3:*
+              - sts:AssumeRole
+              - sts:DecodeAuthorizationMessage
+              - sts:GetAccessKeyInfo
+              - sts:GetFederationToken
+              - sts:GetServiceBearerToken
+              - sts:GetSessionToken
+              - sts:SetContext
+              - kms:*
+              - sqs:*
+              - secretsmanager:*
+              - cognito-idp:*
+              - logs:*
+              - dynamodb:*
+              - ecr:*
+              - aoss:*
+            Resource: "*"
+            Condition:
+              StringNotEqualsIfExists:
+                aws:PrincipalOrgID: !Ref OrganizationId
+              BoolIfExists:
+                aws:PrincipalIsAWSService: "false"
+          - Sid: EnforceConfusedDeputyProtection
+            Effect: Deny
+            Principal: "*"
+            Action:
+              - s3:*
+              - sts:*
+              - kms:*
+              - sqs:*
+              - secretsmanager:*
+              - cognito-identity:*
+              - cognito-idp:*
+              - logs:*
+              - dynamodb:*
+              - ecr:*
+              - aoss:*
+            Resource: "*"
+            Condition:
+              StringNotEqualsIfExists:
+                aws:SourceOrgID: !Ref OrganizationId
+              "Null":
+                aws:SourceAccount: "false"
+              Bool:
+                aws:PrincipalIsAWSService: "true"
+
+Outputs:
+  PolicyId:
+    Value: !Ref IdentityPerimeterRcp
