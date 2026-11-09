@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test the agent boundary SCP in the policy simulator, then attach it to the
-# Agents and Production OUs. Run in the management account, after every member
+# Agents, Preview and Production OUs. Run in the management account, after every member
 # account has the agent boundary and its CDK bootstrap.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -16,4 +16,4 @@ aws cloudformation deploy \
   --template-file infra/scp-agent-boundary.yaml \
   --stack-name agent-boundary-scp \
   --no-fail-on-empty-changeset \
-  --parameter-overrides TargetIds="$(output AgentsOuId),$(output ProductionOuId)"
+  --parameter-overrides TargetIds="$(output AgentsOuId),$(output PreviewOuId),$(output ProductionOuId)"

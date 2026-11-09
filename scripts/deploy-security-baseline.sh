@@ -14,7 +14,7 @@ output() {
   aws cloudformation describe-stacks --stack-name agent-account-structure \
     --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
 }
-ous="$(output AgentsOuId),$(output ProductionOuId)"
+ous="$(output AgentsOuId),$(output PreviewOuId),$(output ProductionOuId)"
 
 aws cloudformation deploy --template-file infra/org-trail.yaml \
   --stack-name organization-trail --no-fail-on-empty-changeset \

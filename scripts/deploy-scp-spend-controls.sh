@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test the spend-controls SCP, then attach it to the Agents and Production OUs.
+# Test the spend-controls SCP, then attach it to the Agents, Preview and Production OUs.
 # Run in the management account.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -14,4 +14,4 @@ aws cloudformation deploy \
   --template-file infra/scp-spend-controls.yaml \
   --stack-name spend-controls-scp \
   --no-fail-on-empty-changeset \
-  --parameter-overrides TargetIds="$(output AgentsOuId),$(output ProductionOuId)"
+  --parameter-overrides TargetIds="$(output AgentsOuId),$(output PreviewOuId),$(output ProductionOuId)"

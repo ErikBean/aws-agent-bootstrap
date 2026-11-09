@@ -19,5 +19,6 @@ aws cloudformation deploy \
   --no-fail-on-empty-changeset \
   --parameter-overrides \
     AgentAccountId="$(output AgentAccountId)" \
+    PreviewAccountId="$(output PreviewAccountId)" \
     ProductionAccountId="$(output ProductionAccountId)" \
     AlertEmail="$BUDGET_ALERT_EMAIL"

@@ -2,9 +2,9 @@
 
 Steps for building the account that aren't fully automated. Run them from a clone of this repo, signed in to the management account with an admin role.
 
-## Create the agent and production accounts
+## Create the agent, preview and production accounts
 
-This implements [`account-structure`](openspec/specs/account-structure/spec.md): a member account used only by agents, in an `Agents` OU, and a production account shared by every app, in a `Production` OU. The agent permission sets are assigned to the agent account and no other. The admin permission set is assigned to both.
+This implements [`account-structure`](openspec/specs/account-structure/spec.md): a member account used only by agents, in an `Agents` OU; a preview account for pull request previews that only CI deploys to, in a `Preview` OU; and a production account shared by every app, in a `Production` OU. Agent-Builder is assigned to the agent account only, and Agent-ReadOnly to the agent and preview accounts. The admin permission set is assigned to all three.
 
 A new organization may be limited to fewer accounts than this needs. Check before deploying:
 
@@ -12,7 +12,7 @@ A new organization may be limited to fewer accounts than this needs. Check befor
 aws service-quotas get-service-quota --service-code organizations --quota-code L-E619E033 --region us-east-1
 ```
 
-The value must be at least the number of accounts already in the organization plus two. If it's lower, request an increase in Service Quotas from the management account. Requests at or below AWS's default of 10 may be refused there, in which case ask for the lowest value it accepts, or open an Account and billing support case.
+The value must be at least the number of accounts already in the organization plus three. If it's lower, request an increase in Service Quotas from the management account. Requests at or below AWS's default of 10 may be refused there, in which case ask for the lowest value it accepts, or open an Account and billing support case.
 
 1. **Sign in** to the management account through IAM Identity Center:
 
@@ -31,7 +31,7 @@ The value must be at least the number of accounts already in the organization pl
    | `BUILDER_PERMISSION_SET_ARN`, `READONLY_PERMISSION_SET_ARN`, `ADMIN_PERMISSION_SET_ARN` | `aws sso-admin list-permission-sets --instance-arn <instance-arn>`, then `aws sso-admin describe-permission-set` on each to find `Agent-Builder`, `Agent-ReadOnly` and `Admin` |
    | `AGENT_PRINCIPAL_ID`, `ADMIN_PRINCIPAL_ID` | `aws identitystore list-users --identity-store-id <store-id>`, where the store ID is in `list-instances`. The agent principal is the dedicated agent user; see [`agent-client`](openspec/specs/agent-client/spec.md). The admin principal is your own user. They must differ, and the stack refuses to deploy if they don't. |
 
-   `AGENT_ACCOUNT_EMAIL` and `PRODUCTION_ACCOUNT_EMAIL` must each be an address no other AWS account uses. A plus-address of an inbox you already read works.
+   `AGENT_ACCOUNT_EMAIL`, `PREVIEW_ACCOUNT_EMAIL` and `PRODUCTION_ACCOUNT_EMAIL` must each be an address no other AWS account uses. A plus-address of an inbox you already read works.
 
 3. **Deploy:**
 
@@ -69,12 +69,13 @@ The new accounts' root users have no password. Leave it that way. Use the manage
 
 ## Put CDK deploys under the agent boundary
 
-This implements [`deploy-permissions`](openspec/specs/deploy-permissions/spec.md) in both member accounts. Run it after the accounts exist and your admin profiles point at them.
+This implements [`deploy-permissions`](openspec/specs/deploy-permissions/spec.md) in every member account. Run it after the accounts exist and your admin profiles point at them.
 
 1. **Deploy the boundary and bootstrap CDK** in each member account:
 
    ```bash
    scripts/deploy-agent-boundary.sh <agent-account-admin-profile>
+   scripts/deploy-agent-boundary.sh <preview-account-admin-profile>
    scripts/deploy-agent-boundary.sh <production-account-admin-profile>
    ```
 
@@ -86,7 +87,7 @@ This implements [`deploy-permissions`](openspec/specs/deploy-permissions/spec.md
    scripts/deploy-scp-agent-boundary.sh
    ```
 
-   It runs `scripts/test-scp-agent-boundary.sh` first, which simulates the SCP against the cases the spec names, and attaches the SCP to the `Agents` and `Production` OUs only if every case passes. You can run the test on its own at any time.
+   It runs `scripts/test-scp-agent-boundary.sh` first, which simulates the SCP against the cases the spec names, and attaches the SCP to the `Agents`, `Preview` and `Production` OUs only if every case passes. You can run the test on its own at any time.
 
 3. **Check** each member account:
 
@@ -116,7 +117,7 @@ It runs `scripts/test-agent-permissions.sh` first, which simulates `PowerUserAcc
 
 This implements [`spend-controls`](openspec/specs/spend-controls/spec.md). Run both from the management account, after the account-structure stack exists. Add `BUDGET_ALERT_EMAIL` to `config.local/account-structure.env` first.
 
-1. **The always-on SCP.** It limits both member accounts to `us-east-1` and `us-west-2`, and denies EC2 instances, Bedrock model use and the fixed-cost services:
+1. **The always-on SCP.** It limits every member account to `us-east-1` and `us-west-2`, and denies EC2 instances, Bedrock model use and the fixed-cost services:
 
    ```bash
    scripts/deploy-scp-spend-controls.sh
@@ -124,7 +125,7 @@ This implements [`spend-controls`](openspec/specs/spend-controls/spec.md). Run b
 
    It runs `scripts/test-scp-spend-controls.sh` first: Access Analyzer's policy validation, then simulator cases for each scenario in the spec. It deploys only if both pass. If a global service you need is ever denied outside the two Regions, add it to the `NotAction` list in `infra/scp-spend-controls.yaml`.
 
-2. **The budgets.** A $10 monthly budget for each member account, with alerts at $5 actual, $8 forecasted and $10 actual. The agent account's budget also has an automatic action that attaches `budget-deny-new-resources`:
+2. **The budgets.** A $10 monthly budget for each member account, with alerts at $5 actual, $8 forecasted and $10 actual. The agent and preview accounts' budgets also have an automatic action that attaches `budget-deny-new-resources`:
 
    ```bash
    scripts/deploy-budgets.sh
@@ -132,7 +133,7 @@ This implements [`spend-controls`](openspec/specs/spend-controls/spec.md). Run b
 
    It runs `scripts/test-scp-budget-deny.sh` first. While that SCP is attached, your Identity Center roles and CDK's roles in the agent account can read and delete, including `cdk destroy`, but can't create, start or update anything. App roles aren't affected, so running apps keep working.
 
-**When the agent account goes over $10:** you get an email, and new work is blocked. To keep going this month, open AWS Budgets → `agent-account-monthly` → the action's history, and choose **Reverse**. Reversing removes the cap for the rest of the month. To allow a higher ceiling instead, raise `MonthlyLimitUsd` and redeploy.
+**When the agent or preview account goes over $10:** you get an email, and new work is blocked. To keep going this month, open AWS Budgets → `agent-account-monthly` or `preview-account-monthly` → the action's history, and choose **Reverse**. Reversing removes the cap for the rest of the month. To allow a higher ceiling instead, raise `MonthlyLimitUsd` and redeploy.
 
 **Two things to test once the agent account exists**, which no source settles:
 
@@ -161,12 +162,13 @@ This implements [`security-baseline`](openspec/specs/security-baseline/spec.md).
 
    ```bash
    scripts/deploy-access-analyzer.sh <agent account admin profile>
+   scripts/deploy-access-analyzer.sh <preview account admin profile>
    scripts/deploy-access-analyzer.sh <production account admin profile>
    ```
 
 4. **Steps in the console:**
    - **Root MFA:** confirm the management account's root user has MFA, under IAM → Security credentials while signed in as root.
-   - **No root credentials in member accounts:** in the management account, open IAM → Root access management and turn on centralized root access. Check that both member accounts show no root credentials. Accounts created through Organizations start without them.
+   - **No root credentials in member accounts:** in the management account, open IAM → Root access management and turn on centralized root access. Check that every member accounts show no root credentials. Accounts created through Organizations start without them.
    - **Free Tier alerts:** in the management account, open Billing → Billing preferences → Alert preferences and select **Receive AWS Free Tier alerts**.
 
 5. **Test the RCP on the empty accounts**, since the simulator can't:
