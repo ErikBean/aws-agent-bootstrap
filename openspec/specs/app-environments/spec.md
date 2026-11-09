@@ -62,17 +62,35 @@ Reasoning: `cdk diff` runs the pull request's own code, which agents write, so a
 
 ### Requirement: dev and preview stages clean up after themselves
 
-The `dev` and `preview` stages SHALL delete their data with their stacks, using a destroy removal policy and automatic emptying of buckets. A preview SHALL be destroyed when its pull request closes. The factory's ship stage SHALL destroy the branch's `dev` stack once its pull request merges or closes.
+The `dev` and `preview` stages SHALL delete their data with their stacks, using a destroy removal policy and automatic emptying of buckets. A preview SHALL be destroyed when its pull request closes. A branch's `dev` stacks SHALL stay up while its pull request is open, and CI SHALL destroy them automatically when it merges or closes, with no step for the developer to remember.
+
+CI SHALL destroy `dev` stacks through a cleanup role in the agent account that:
+
+- only the cleanup workflow on the app's default branch can assume, so a pull request can't change the code that holds it;
+- can only delete stacks tagged with the app's project and `stage=dev`, through the CDK execution role;
+- carries the agent boundary.
+
+Reasoning: the developer keeps `dev` for trying things while a pull request is in review, and wouldn't reliably clean it up by hand. Restricting the role to one reviewed workflow and to deleting `dev` stacks keeps pull request code from using the agent account.
 
 #### Scenario: A pull request closes
 
 - **WHEN** a pull request is merged or closed
 - **THEN** its preview stack is destroyed and leaves no resources behind
 
-#### Scenario: The ship stage finishes
+#### Scenario: A pull request with a dev stage is open
 
-- **WHEN** the factory's ship stage completes for a branch
-- **THEN** that branch's `dev` stack in the agent account is destroyed
+- **WHEN** the factory's ship stage has opened a pull request for a branch
+- **THEN** that branch's `dev` stacks are still deployed in the agent account
+
+#### Scenario: A pull request with a dev stage closes
+
+- **WHEN** the pull request is merged or closed
+- **THEN** CI deletes that branch's `dev` stacks in the agent account, and no other stacks
+
+#### Scenario: A pull request changes the cleanup workflow
+
+- **WHEN** a pull request's own copy of the cleanup workflow tries to assume the cleanup role
+- **THEN** the assumption is denied
 
 ### Requirement: A weekly report of resources outside any stack
 
