@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The free or nearly free security controls on the organization and its member accounts, the agent and production accounts: an audit trail, checks for external access, public-access settings that the agent account can't change, and a resource perimeter that keeps other AWS accounts out of the agent account's resources.
+The free or nearly free security controls on the organization and its member accounts, the agent, preview and production accounts: an audit trail, checks for external access, public-access settings that the agent account can't change, and a resource perimeter that keeps other AWS accounts out of the agent account's resources.
 
 Reasoning: [decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/security-baseline.md), which links the research behind it, and the [production account decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/production-account-guardrails.md).
 
@@ -10,7 +10,7 @@ Reasoning: [decision](https://github.com/ErikBean/research/blob/main/knowledge/p
 
 ### Requirement: Root users are protected
 
-The management account's root user SHALL have MFA registered. Neither member account SHALL have root user credentials.
+The management account's root user SHALL have MFA registered. No member account SHALL have root user credentials.
 
 #### Scenario: Checking a member account's root user
 
@@ -44,7 +44,7 @@ Each member account SHALL have an IAM Access Analyzer external access analyzer.
 
 ### Requirement: Public-access settings are locked
 
-Declarative policies SHALL apply to both member accounts:
+Declarative policies SHALL apply to every member account:
 
 - an Amazon S3 policy turning on all four S3 Block Public Access settings
 - an EC2 policy setting VPC Block Public Access to block inbound internet traffic (`block_ingress`), blocking new public sharing of AMIs, and blocking public sharing of EBS snapshots
