@@ -138,3 +138,40 @@ This implements [`spend-controls`](openspec/specs/spend-controls/spec.md). Run b
 
 - At the start of the next month, check whether `budget-deny-new-resources` is still attached to the agent account (`aws organizations list-policies-for-target --target-id <agent account ID> --filter SERVICE_CONTROL_POLICY`). AWS says SCP actions reset each period, but not whether the reset detaches the policy. Record the answer here.
 - Whether the read and delete list in `infra/budgets.yaml` is enough for `cdk destroy` of a real stack. If a delete is denied, add that action to the list.
+
+## Set up the security baseline
+
+This implements [`security-baseline`](openspec/specs/security-baseline/spec.md). Run it while the member accounts have no workloads, because the RCP is tested by attaching it to empty accounts.
+
+1. **Enable the organization policy types.** Run this before *any* SCP, RCP or declarative policy in this runbook, including the boundary and spend-control SCPs above. It's safe to rerun:
+
+   ```bash
+   scripts/enable-policy-types.sh
+   ```
+
+2. **Deploy the management-account parts:**
+
+   ```bash
+   scripts/deploy-security-baseline.sh
+   ```
+
+   It validates the RCP with Access Analyzer first, then deploys the organization trail, the declarative S3 and EC2 public-access policies, and the identity-perimeter RCP, and finishes with `scripts/check-security-baseline.sh`. Creating the organization trail turns on CloudTrail's trusted access in Organizations. If the check lists any trail besides `organization-trail`, delete it, or it records a second, paid copy of management events.
+
+3. **Deploy Access Analyzer in each member account.** Analyzers are Regional, so the script deploys one in each of the two Regions. Use your Admin profile for each account:
+
+   ```bash
+   scripts/deploy-access-analyzer.sh <agent account admin profile>
+   scripts/deploy-access-analyzer.sh <production account admin profile>
+   ```
+
+4. **Steps in the console:**
+   - **Root MFA:** confirm the management account's root user has MFA, under IAM → Security credentials while signed in as root.
+   - **No root credentials in member accounts:** in the management account, open IAM → Root access management and turn on centralized root access. Check that both member accounts show no root credentials. Accounts created through Organizations start without them.
+   - **Free Tier alerts:** in the management account, open Billing → Billing preferences → Alert preferences and select **Receive AWS Free Tier alerts**.
+
+5. **Test the RCP on the empty accounts**, since the simulator can't:
+   - Deploy a CDK app with an S3 bucket served by CloudFront through origin access control to the agent account, and check that the page loads. CloudFront reads the bucket as an AWS service acting for your organization, which the RCP allows.
+   - Check that `cdk deploy` and `cdk destroy` work at all. Deploys use roles inside the organization.
+   - If an access-denied error mentions a resource control policy, detach the RCP (`aws organizations detach-policy`), investigate, and record what needed an exception here.
+
+**Before creating any GitHub OIDC deploy role** in a member account, add a statement to `infra/rcp-identity-perimeter.yaml` that limits `sts:AssumeRoleWithWebIdentity` to your GitHub owner by `token.actions.githubusercontent.com:repository_owner_id`. The `factory-repo-setup` skill gives the exact statement. The first deploy from GitHub Actions is its test.
