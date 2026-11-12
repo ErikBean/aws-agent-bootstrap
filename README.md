@@ -10,6 +10,6 @@ It's a reference for other projects and tools. The specs say what a safe agent a
 - Code: [`infra/`](infra) holds the CloudFormation templates, deployed by the scripts in [`scripts/`](scripts). Real account values are read from gitignored config in `config.local/`.
 - Manual steps: [`RUNBOOK.md`](RUNBOOK.md)
 
-Status: [`account-structure`](openspec/specs/account-structure/spec.md), [`deploy-permissions`](openspec/specs/deploy-permissions/spec.md) and [`agent-permissions`](openspec/specs/agent-permissions/spec.md) have code.
+Status: [`account-structure`](openspec/specs/account-structure/spec.md), [`deploy-permissions`](openspec/specs/deploy-permissions/spec.md) and [`agent-permissions`](openspec/specs/agent-permissions/spec.md) have code. Until the organization's account quota allows member accounts, the runbook's interim section runs agents and apps in the management account.
 
 This repo is public and contains no values from a real account. See [AGENTS.md](AGENTS.md) for how that is kept true.

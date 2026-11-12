@@ -4,7 +4,10 @@
     {
       "Sid": "NoMarketplaceTerms",
       "Effect": "Deny",
-      "Action": ["aws-marketplace:Subscribe", "aws-marketplace:AcceptAgreementRequest"],
+      "Action": [
+        "aws-marketplace:Subscribe",
+        "aws-marketplace:AcceptAgreementRequest"
+      ],
       "Resource": "*"
     },
     {
@@ -13,7 +16,87 @@
       "Action": "iam:PassRole",
       "Resource": "arn:aws:iam::*:role/agent/*",
       "Condition": {
-        "StringEquals": { "iam:PassedToService": ["lambda.amazonaws.com"] }
+        "StringEquals": {
+          "iam:PassedToService": [
+            "lambda.amazonaws.com"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "NoIdentityCenterChanges",
+      "Effect": "Deny",
+      "Action": [
+        "sso:*",
+        "sso-directory:*",
+        "identitystore:*",
+        "identity-sync:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NoBudgetChanges",
+      "Effect": "Deny",
+      "Action": [
+        "budgets:Create*",
+        "budgets:Delete*",
+        "budgets:Modify*",
+        "budgets:Update*",
+        "budgets:Execute*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NoTrailChanges",
+      "Effect": "Deny",
+      "Action": [
+        "cloudtrail:Create*",
+        "cloudtrail:Delete*",
+        "cloudtrail:Put*",
+        "cloudtrail:Stop*",
+        "cloudtrail:Update*",
+        "cloudtrail:RemoveTags"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NoBillingChanges",
+      "Effect": "Deny",
+      "Action": [
+        "aws-portal:Modify*",
+        "billing:Put*",
+        "billing:Update*",
+        "billing:Create*",
+        "billing:Delete*",
+        "payments:*",
+        "tax:Put*",
+        "tax:Delete*",
+        "tax:BatchPut*",
+        "ce:Create*",
+        "ce:Delete*",
+        "ce:Update*",
+        "freetier:Put*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NoCiDeployRoles",
+      "Effect": "Deny",
+      "Action": "sts:AssumeRole",
+      "Resource": "arn:aws:iam::*:role/cdk-ci-*"
+    },
+    {
+      "Sid": "NoChangesToCiDeployedStages",
+      "Effect": "Deny",
+      "Action": "*",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/stage": [
+            "prod",
+            "preview"
+          ]
+        }
       }
     }
   ]

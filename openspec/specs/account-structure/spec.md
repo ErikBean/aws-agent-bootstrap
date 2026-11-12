@@ -87,3 +87,29 @@ Reasoning: SCPs don't affect the management account, only member accounts ([find
 
 - **WHEN** an SCP that denies an action is attached to a member account, or to its organizational unit
 - **THEN** a request for that action from any role in that account, including an agent's or a CI deploy role's, is denied
+
+### Requirement: Interim management-account mode until the account quota allows member accounts
+
+While the organization's account quota leaves no room for member accounts, the management account SHALL serve as the agent, preview and production account, and the agent permission sets SHALL be assigned there to the dedicated agent user only. Requirements that need member accounts, SCPs, RCPs, declarative policies or budget actions are suspended until then.
+
+Reasoning: [decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/interim-management-account.md), after AWS declined to raise the quota ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/new-org-account-quota-below-default.md)).
+
+#### Scenario: Listing who holds the agent permission sets during the interim
+
+- **WHEN** the assignments of the agent permission sets in the management account are listed
+- **THEN** the dedicated agent user is the only principal
+
+#### Scenario: The agent user gets the builder
+
+- **WHEN** the agent user is first assigned the builder permission set in the management account
+- **THEN** the builder already has the denies [agent-permissions](../agent-permissions/spec.md) requires, and the account already has the separate CI bootstrap [deploy-permissions](../deploy-permissions/spec.md) requires
+
+#### Scenario: Budgets during the interim
+
+- **WHEN** spending crosses a budget threshold
+- **THEN** the developer gets an alert, but no automatic deny, because budget actions apply SCPs
+
+#### Scenario: The quota is raised
+
+- **WHEN** the organization's account quota allows the member accounts
+- **THEN** the member accounts are created, apps are redeployed to them, and no agent permission set remains assigned in the management account

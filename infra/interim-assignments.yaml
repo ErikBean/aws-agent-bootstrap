@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Interim management-account mode: assigns Agent-Builder and Agent-ReadOnly to
+  the agent user in the management account, while the organization's account
+  quota leaves no room for member accounts. Delete this stack when the member
+  accounts exist. Implements the interim requirement in
+  openspec/specs/account-structure/spec.md.
+
+Parameters:
+  ManagementAccountId:
+    Type: String
+    AllowedPattern: "^[0-9]{12}$"
+  IdentityCenterInstanceArn:
+    Type: String
+  BuilderPermissionSetArn:
+    Type: String
+  ReadOnlyPermissionSetArn:
+    Type: String
+  AgentPrincipalId:
+    Type: String
+    Description: The dedicated agent user. Never the developer's own user.
+  AdminPrincipalId:
+    Type: String
+    Description: The developer's own user, only to check it differs from the agent user.
+
+Rules:
+  AgentIsNotAdmin:
+    Assertions:
+      - Assert: !Not [!Equals [!Ref AgentPrincipalId, !Ref AdminPrincipalId]]
+        AssertDescription: The agent user must not be the developer's own user.
+
+Resources:
+  BuilderAssignment:
+    Type: AWS::SSO::Assignment
+    Properties:
+      InstanceArn: !Ref IdentityCenterInstanceArn
+      PermissionSetArn: !Ref BuilderPermissionSetArn
+      PrincipalId: !Ref AgentPrincipalId
+      PrincipalType: USER
+      TargetId: !Ref ManagementAccountId
+      TargetType: AWS_ACCOUNT
+
+  ReadOnlyAssignment:
+    Type: AWS::SSO::Assignment
+    Properties:
+      InstanceArn: !Ref IdentityCenterInstanceArn
+      PermissionSetArn: !Ref ReadOnlyPermissionSetArn
+      PrincipalId: !Ref AgentPrincipalId
+      PrincipalType: USER
+      TargetId: !Ref ManagementAccountId
+      TargetType: AWS_ACCOUNT

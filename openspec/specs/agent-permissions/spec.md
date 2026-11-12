@@ -48,3 +48,45 @@ Reasoning: [finding](https://github.com/ErikBean/research/blob/main/knowledge/te
 
 - **WHEN** the builder passes a role under `/agent/` to a service not on the allowed list
 - **THEN** the request is denied
+
+### Requirement: The builder can't change identity, budgets, the audit trail or billing
+
+The builder permission set SHALL deny IAM Identity Center, Identity Store and directory actions, and changes to Budgets, CloudTrail, billing, payments, tax, Cost Explorer and Free Tier alerts. Reading budgets and trail events stays allowed.
+
+Reasoning: `PowerUserAccess` allows these ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/poweruser-allows-identity-center-and-audit-changes.md)), and no SCP covers the management account ([decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/interim-management-account.md)).
+
+#### Scenario: An agent tries to assign itself a permission set
+
+- **WHEN** the builder calls `sso:CreateAccountAssignment`
+- **THEN** the request is denied
+
+#### Scenario: An agent tries to stop the trail or change a budget
+
+- **WHEN** the builder calls `cloudtrail:StopLogging` or `budgets:ModifyBudget`
+- **THEN** the request is denied
+
+#### Scenario: An agent reads a budget
+
+- **WHEN** the builder calls `budgets:ViewBudget`
+- **THEN** the request is allowed
+
+### Requirement: The builder can't deploy or change stages only CI deploys
+
+The builder permission set SHALL deny `sts:AssumeRole` on the `ci` qualifier's CDK bootstrap roles, and every action on resources tagged `stage=prod` or `stage=preview`. The tag deny covers only actions that support the `aws:ResourceTag` condition key.
+
+Reasoning: this matters where `dev` shares an account with `preview` or `prod` ([decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/interim-management-account.md)).
+
+#### Scenario: An agent deploys to prod from its machine
+
+- **WHEN** the builder tries to assume a `cdk-ci-*` role
+- **THEN** the request is denied
+
+#### Scenario: An agent changes a prod stack directly
+
+- **WHEN** the builder calls a CloudFormation action on a stack tagged `stage=prod`
+- **THEN** the request is denied
+
+#### Scenario: An agent works on its own dev stack
+
+- **WHEN** the builder calls a CloudFormation action on a stack tagged `stage=dev`
+- **THEN** the request is allowed
