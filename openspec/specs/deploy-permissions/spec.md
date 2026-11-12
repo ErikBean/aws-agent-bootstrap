@@ -47,6 +47,17 @@ Reasoning: by default CDK's execution role has `AdministratorAccess` with no bou
 - **WHEN** a member account is bootstrapped again through the account-level setup
 - **THEN** the bootstrap roles still carry the agent boundary
 
+### Requirement: Stages only CI deploys use their own bootstrap where they share an account with dev
+
+Where an account holds `dev` and also `preview` or `prod`, it SHALL also be bootstrapped as the stack `CDKToolkit-ci` with the qualifier `ci` and the agent boundary on all roles. Apps SHALL deploy `preview` and `prod` with that qualifier, and `dev` with the default one.
+
+Reasoning: [decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/interim-management-account.md). [agent-permissions](../agent-permissions/spec.md) denies the builder the `ci` roles.
+
+#### Scenario: Inspecting the ci bootstrap roles
+
+- **WHEN** the permissions boundary of each role in `CDKToolkit-ci` is read
+- **THEN** every one is the agent boundary
+
 ### Requirement: CDK apps attach the boundary to the roles they create
 
 Every CDK app deployed to a member account SHALL set the `@aws-cdk/core:permissionsBoundary` context key to the agent boundary.

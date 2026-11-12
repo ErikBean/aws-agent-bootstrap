@@ -2,6 +2,57 @@
 
 Steps for building the account that aren't fully automated. Run them from a clone of this repo, signed in to the management account with an admin role.
 
+## Interim: work in the management account
+
+Use this section instead of the rest of the runbook while the organization's account quota leaves no room for member accounts. It implements the interim requirement in [`account-structure`](openspec/specs/account-structure/spec.md). Check the quota with:
+
+```bash
+aws service-quotas get-service-quota --service-code organizations --quota-code L-E619E033 --region us-east-1
+```
+
+Run everything with your Admin profile in the management account, in this order:
+
+1. **Create the agent user** in the IAM Identity Center console, as [`agent-client`](openspec/specs/agent-client/spec.md) describes, if it doesn't exist yet. Fill in `config.local/account-structure.env`, including `AGENT_PRINCIPAL_ID` and `ADMIN_PRINCIPAL_ID`.
+2. **Remove the agent permission sets from your own user** in the management account. Until then, your Identity Center token reaches both Admin and the builder:
+
+   ```bash
+   aws sso-admin delete-account-assignment --instance-arn <instance-arn> \
+     --permission-set-arn <Agent-Builder or Agent-ReadOnly ARN> \
+     --principal-id <your user ID> --principal-type USER \
+     --target-id <management account ID> --target-type AWS_ACCOUNT
+   ```
+
+3. **Deploy the boundary, and bootstrap CDK twice:** once for `dev`, and once with the `ci` qualifier for `preview` and `prod`, which only CI deploys:
+
+   ```bash
+   scripts/deploy-agent-boundary.sh <admin profile> us-east-1 --ci-bootstrap
+   scripts/check-deploy-permissions.sh <admin profile>
+   ```
+
+   The check skips its unbounded-role test, because that test needs the boundary SCP, which doesn't apply in the management account.
+4. **Apply the builder's permissions**, including its interim denies. This must happen before the agent user gets the builder:
+
+   ```bash
+   scripts/apply-agent-permissions.sh
+   ```
+
+5. **Assign the agent permission sets to the agent user:**
+
+   ```bash
+   scripts/deploy-interim-assignments.sh
+   ```
+
+   It ends by listing who holds each agent permission set. Only the agent user should be there.
+6. **Skip** the SCPs, the RCP, the declarative policies and the budget actions. None of them apply to the management account. Your existing budgets still email alerts.
+
+When AWS raises the quota:
+
+1. Run the rest of this runbook.
+2. Redeploy each app to the member accounts.
+3. Delete the `interim-agent-assignments` stack.
+
+Until then, re-request the quota from time to time: AWS raises it gradually as the account builds history.
+
 ## Create the agent, preview and production accounts
 
 This implements [`account-structure`](openspec/specs/account-structure/spec.md): a member account used only by agents, in an `Agents` OU; a preview account for pull request previews that only CI deploys to, in a `Preview` OU; and a production account shared by every app, in a `Production` OU. Agent-Builder is assigned to the agent account only, and Agent-ReadOnly to the agent and preview accounts. The admin permission set is assigned to all three.
@@ -100,10 +151,12 @@ This implements [`deploy-permissions`](openspec/specs/deploy-permissions/spec.md
 
 ## Set the agent permission sets
 
-This implements [`agent-permissions`](openspec/specs/agent-permissions/spec.md). The `Agent-Builder` permission set keeps AWS's `PowerUserAccess` managed policy, which grants no IAM role or policy management and no `iam:PassRole`. Its inline policy, in `infra/agent-builder-inline-policy.json`, adds two statements:
+This implements [`agent-permissions`](openspec/specs/agent-permissions/spec.md). The `Agent-Builder` permission set keeps AWS's `PowerUserAccess` managed policy, which grants no IAM role or policy management and no `iam:PassRole`. Its inline policy, in `infra/agent-builder-inline-policy.json`, adds:
 
 - A deny on AWS Marketplace subscriptions.
 - `iam:PassRole` for roles under `/agent/`, only to the services the spec allows.
+- Denies on IAM Identity Center, Identity Store, and changes to budgets, CloudTrail and billing.
+- Denies on the `ci` bootstrap's roles and on resources tagged `stage=prod` or `stage=preview`.
 
 From the management account:
 
