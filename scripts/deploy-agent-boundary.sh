@@ -19,6 +19,7 @@ aws=(aws --profile "$profile" --region "$region")
 "${aws[@]}" cloudformation deploy \
   --template-file infra/agent-boundary.yaml \
   --stack-name agent-boundary \
+  --capabilities CAPABILITY_NAMED_IAM \
   --no-fail-on-empty-changeset
 
 # Same as `cdk bootstrap --custom-permissions-boundary agent-boundary
