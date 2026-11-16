@@ -1,0 +1,7 @@
+{
+  "appId": "YOUR_APP_ID",
+  "installationId": "YOUR_INSTALLATION_ID",
+  "workspaces": {
+    "/home/YOUR_USER/Code": ["repo-one", "repo-two"]
+  }
+}

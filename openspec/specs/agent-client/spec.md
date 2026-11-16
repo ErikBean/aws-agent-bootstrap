@@ -148,3 +148,23 @@ Reasoning: a test showed hooks outside the sandbox can refresh a token that sand
 - **WHEN** a sandboxed command tries to read the agent app's private key
 - **THEN** the read is denied
 
+### Requirement: Each session's GitHub token covers only its project's repos
+
+Each Claude Code session SHALL get its own token, kept in a token file for that session, so sessions running side by side don't share or overwrite tokens. The token SHALL cover only the repos of the folder the session started in, fixed for the session: the repos the developer maps to that folder in the hook's config, or else the GitHub repo the folder is in. A session started in a folder with neither SHALL get no token. The map SHALL live where sandboxed commands can't write it.
+
+Reasoning: GitHub can narrow an installation token to named repositories when minting it ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/github-agent-access/findings/app-installation-tokens.md)); scoping by the starting folder keeps a session from writing to repos it isn't working on, without a later change of folder widening it ([decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/agent-github-access.md)).
+
+#### Scenario: A session in one repo pushes to another
+
+- **WHEN** a session started in one repo's folder tries to push to a different repo in the agent app's installation
+- **THEN** GitHub refuses the push
+
+#### Scenario: A session in a mapped parent folder
+
+- **WHEN** a session starts in a folder the config maps to several repos
+- **THEN** its token can write to exactly those repos
+
+#### Scenario: Two sessions at once
+
+- **WHEN** two sessions started in different repos run at the same time
+- **THEN** each keeps its own token, scoped to its own repo
