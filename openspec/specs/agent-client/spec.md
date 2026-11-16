@@ -2,9 +2,9 @@
 
 ## Purpose
 
-How the developer's machine is set up so AI coding agents, such as Claude Code, get AWS access only through agent roles, and run inside a strict sandbox. These controls shape what agents try and protect the credentials themselves; the AWS-side specs are what AWS enforces.
+How the developer's machine is set up so AI coding agents, such as Claude Code, get AWS access only through agent roles and GitHub access only through an agent GitHub App, and run inside a strict sandbox that keeps the developer's own credentials out of reach. These controls shape what agents try and protect the credentials themselves; the AWS-side specs are what AWS enforces.
 
-Reasoning: [decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/agent-client-setup.md), which links the research behind it.
+Reasoning: [client setup decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/agent-client-setup.md) and [GitHub access decision](https://github.com/ErikBean/research/blob/main/knowledge/projects/aws-agent-bootstrap/decisions/agent-github-access.md), which link the research behind them.
 
 Example files: [`client/claude-settings.example.json`](../../../client/claude-settings.example.json) and [`client/aws-agent-config.example`](../../../client/aws-agent-config.example).
 
@@ -39,6 +39,11 @@ The agent permission sets SHALL have a session duration of 4 hours, so credentia
 
 The developer SHALL sign out of their own Identity Center session (`aws sso logout`) when they finish administration, so no token for a user with admin assignments is in the cache while agents run. The runbook SHALL say so.
 
+#### Scenario: Agents run after administration
+
+- **WHEN** an agent session runs after the developer has finished administration
+- **THEN** the AWS CLI's token cache holds no token for a user with admin assignments
+
 ### Requirement: Agent sessions see only agent profiles
 
 Claude Code SHALL set `AWS_CONFIG_FILE` to a config file that defines only the agent user's sign-in and its builder and view-only profiles, and `AWS_PROFILE` to the builder profile.
@@ -50,7 +55,7 @@ Claude Code SHALL set `AWS_CONFIG_FILE` to a config file that defines only the a
 
 ### Requirement: A strict sandbox
 
-Claude Code SHALL run with the sandbox enabled, refusing to start if the sandbox is unavailable, with unsandboxed retries turned off. Sandboxed commands SHALL be allowed to reach `*.amazonaws.com`, plus any hosts a project needs. Sandboxed commands SHALL be denied read access to the developer's admin session token file.
+Claude Code SHALL run with the sandbox enabled, refusing to start if the sandbox is unavailable, with unsandboxed retries turned off. Sandboxed commands SHALL be allowed to reach `*.amazonaws.com`, `github.com`, `api.github.com`, `*.githubusercontent.com` and `registry.npmjs.org`, plus any hosts a project needs. Sandboxed commands SHALL be denied read access to the developer's admin session token file, the developer's SSH private keys and the agent GitHub App's private key, and SHALL NOT receive `SSH_AUTH_SOCK`. Sandboxed commands SHALL be able to write npm's cache (`~/.npm`) and, when the factory observer is on, its local bundle and notes (`~/.local/share/factory-observer`, `~/.local/state/factory-observer`).
 
 Reasoning: the sandbox covers only shell commands; MCP servers, hooks and Claude's file tools run outside it ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/aws-agent-guardrails/findings/claude-code-sandbox-shell-only.md)).
 
@@ -68,6 +73,13 @@ Reasoning: the sandbox covers only shell commands; MCP servers, hooks and Claude
 
 - **WHEN** a sandboxed command tries to read the developer's admin session token file
 - **THEN** the read is denied
+
+#### Scenario: A command pushes with the developer's SSH key
+
+- **WHEN** a sandboxed command runs `git ls-remote` or `git push` against GitHub over SSH
+- **THEN** it fails, because neither the developer's key file nor their SSH agent is reachable
+
+Reasoning: without these denies, a sandboxed `git` could still push with the developer's key ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/github-agent-access/findings/sandbox-local-test-gh-ssh.md)).
 
 ### Requirement: No bypass mode
 
@@ -98,3 +110,41 @@ These SHALL be ask rules, not deny rules. With the sandbox on, Claude Code adds 
 
 - **WHEN** Claude runs `aws sts get-caller-identity` with the agent profile in a sandboxed command
 - **THEN** it succeeds, using the cached sign-in
+
+### Requirement: Agents reach GitHub only as an agent GitHub App
+
+Agents SHALL reach GitHub only with installation tokens of a GitHub App owned by the developer, the agent app, installed on only the repositories agents work on. The agent app SHALL have Contents, Pull requests and Workflows write and read access to Actions and checks, and SHALL NOT have Administration or Variables permissions. It SHALL NOT be on any ruleset's bypass list. Repository administration, such as creating a repository, setting its variables, adding its rulesets and adding it to the agent app's installation, SHALL be done by the developer.
+
+Reasoning: installation tokens expire after 1 hour and can't exceed the installation's repositories ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/github-agent-access/findings/app-installation-tokens.md)); an actor allowed to bypass a ruleset for pull requests only can still merge past it ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/github-agent-access/findings/ruleset-bypass-actors.md)).
+
+#### Scenario: An agent opens a pull request
+
+- **WHEN** an agent pushes a branch and opens a pull request on a repository in the agent app's installation
+- **THEN** both succeed over HTTPS and the pull request is attributed to the agent app
+
+#### Scenario: An agent works on a repository outside the installation
+
+- **WHEN** an agent tries to push to a repository that isn't in the agent app's installation
+- **THEN** the push fails
+
+#### Scenario: An agent changes a ruleset
+
+- **WHEN** an agent tries to change or delete a repository's ruleset
+- **THEN** GitHub refuses, because the agent app has no Administration permission
+
+### Requirement: Hooks mint agent GitHub tokens outside the sandbox
+
+The agent app's private key SHALL be readable only by the developer's user and denied to sandboxed commands. Claude Code hooks, which run outside the sandbox, SHALL mint installation tokens from it into a token file that sandboxed commands can read but not write, and SHALL replace the token before it expires. A SessionStart hook SHALL make sandboxed commands read `GH_TOKEN` from that file through `CLAUDE_ENV_FILE`, and git SHALL use `GH_TOKEN` for HTTPS remotes on GitHub. The hook scripts SHALL live where sandboxed commands can't edit them, and SHALL NOT print the token.
+
+Reasoning: a test showed hooks outside the sandbox can refresh a token that sandboxed commands read through `CLAUDE_ENV_FILE` ([finding](https://github.com/ErikBean/research/blob/main/knowledge/tech/github-agent-access/findings/claude-code-hook-token-refresh-test.md)).
+
+#### Scenario: A session runs longer than an hour
+
+- **WHEN** an agent pushes more than an hour after its session started
+- **THEN** the push succeeds with a token minted within the last hour
+
+#### Scenario: A command reads the app's private key
+
+- **WHEN** a sandboxed command tries to read the agent app's private key
+- **THEN** the read is denied
+
