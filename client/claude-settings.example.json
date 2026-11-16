@@ -21,7 +21,18 @@
     "allowUnsandboxedCommands": false,
     "network": {
       "allowedDomains": [
-        "*.amazonaws.com"
+        "*.amazonaws.com",
+        "github.com",
+        "api.github.com",
+        "*.githubusercontent.com",
+        "registry.npmjs.org"
+      ]
+    },
+    "filesystem": {
+      "allowWrite": [
+        "~/.npm",
+        "~/.local/share/factory-observer",
+        "~/.local/state/factory-observer"
       ]
     },
     "credentials": {
@@ -29,8 +40,47 @@
         {
           "path": "~/.aws/sso/cache/ADMIN_SESSION_TOKEN_FILE.json",
           "mode": "deny"
+        },
+        {
+          "path": "~/.ssh/YOUR_SSH_KEY",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.config/agent-github/app.pem",
+          "mode": "deny"
+        }
+      ],
+      "envVars": [
+        {
+          "name": "SSH_AUTH_SOCK",
+          "mode": "deny"
         }
       ]
     }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/YOUR_USER/.claude/hooks/agent-github-token.mjs session-start",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/YOUR_USER/.claude/hooks/agent-github-token.mjs pre-bash",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
   }
 }
